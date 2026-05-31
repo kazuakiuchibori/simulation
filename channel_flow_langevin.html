@@ -745,7 +745,7 @@
             }
 
             let h_tick = 1e-4;
-            ctx.fillStyle = '#999'; ctx.font = '10px sans-serif';
+            ctx.fillStyle = '#999'; ctx.font = '11px sans-serif';
             while (h_tick < delta) {
                 const gy = toSY(h_tick, delta);
                 ctx.strokeStyle = 'rgba(0,0,0,0.12)'; ctx.setLineDash([2, 4]);
@@ -764,7 +764,7 @@
             ctx.strokeStyle = '#999'; ctx.lineWidth = 1.5; ctx.setLineDash([5, 4]);
             ctx.beginPath(); ctx.moveTo(MX, centerGy); ctx.lineTo(MX + PW, centerGy); ctx.stroke();
             ctx.setLineDash([]);
-            ctx.fillStyle = '#999'; ctx.font = '10px sans-serif';
+            ctx.fillStyle = '#999'; ctx.font = '11px sans-serif';
             const centerMm = (delta * 1000).toFixed(0);
             ctx.fillText(`${centerMm} mm`, MX - 48, centerGy + 4);
 
