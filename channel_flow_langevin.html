@@ -216,9 +216,9 @@
         <h1>Web CFD - Langevin Dynamics Simulation: Channel Flow with Wall Adsorption</h1>
 
         <div class="stats-grid">
-            <div class="stat-card"><div class="stat-label">生存粒子数 N_flow</div><div id="s-alive" class="stat-value">0</div></div>
+            <div class="stat-card"><div class="stat-label">流動粒子数 N_flow</div><div id="s-alive" class="stat-value">0</div></div>
             <div class="stat-card"><div class="stat-label">累計吸着数 N_wall</div><div id="s-dead" class="stat-value">0</div></div>
-            <div class="stat-card"><div class="stat-label">回収効率 η = N_dead/(N_dead+N_exit)</div><div id="s-rate" class="stat-value">0%</div></div>
+            <div class="stat-card"><div class="stat-label">吸着効率 η = N_dead/(N_dead+N_exit)</div><div id="s-rate" class="stat-value">0%</div></div>
             <div class="stat-card"><div class="stat-label">経過時間 t</div><div id="s-time" class="stat-value">0.0 s</div></div>
             <div class="stat-card">
                 <div class="stat-label">物質伝達係数 km [m/s]</div>
@@ -275,7 +275,7 @@
                     <span id="v-q" class="v-val">1.0</span>
                 </div>
                 <div class="control-row">
-                    <label for="sl-vw">膜の吸収速度 v_w [m/s]</label>
+                    <label for="sl-vw">膜透過速度 v_w [m/s]</label>
                     <input id="sl-vw" type="range" min="0.000" max="0.1" step="0.001" value="0.01">
                     <span id="v-vw" class="v-val">0.001</span>
                 </div>
