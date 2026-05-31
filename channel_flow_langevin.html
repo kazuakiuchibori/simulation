@@ -766,7 +766,7 @@
             ctx.setLineDash([]);
             ctx.fillStyle = '#999'; ctx.font = '10px sans-serif';
             const centerMm = (delta * 1000).toFixed(0);
-            ctx.fillText(`${centerMm} mm`, MX + PW + 6, centerGy + 4);
+            ctx.fillText(`${centerMm} mm`, MX - 48, centerGy + 4);
 
             if (showMap) {
 
@@ -823,12 +823,12 @@
                     ctx.save();
                     ctx.strokeStyle = '#cc44cc';
                     ctx.lineWidth = 1.5;
-                    ctx.setLineDash([6, 4]);
+                    ctx.setLineDash([4, 4]);
                     ctx.beginPath(); ctx.moveTo(MX, dcY); ctx.lineTo(MX + PW, dcY); ctx.stroke();
                     ctx.setLineDash([]);
                     ctx.fillStyle = '#cc44cc';
                     ctx.font = '11px sans-serif';
-                    ctx.fillText('δc', MX + PW + 6, dcY + 4);
+                    ctx.fillText('δc', MX - 48, dcY + 4);
                     ctx.restore();
                 }
             }
@@ -846,7 +846,7 @@
                     ctx.setLineDash([]);
                     ctx.fillStyle = '#e08020';
                     ctx.font = '11px sans-serif';
-                    ctx.fillText('yv', MX + PW + 6, yvY + 4);
+                    ctx.fillText('yv', MX - 48, yvY + 4);
                     ctx.restore();
                 }
             }
