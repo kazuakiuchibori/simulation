@@ -312,7 +312,7 @@
                     </div>
                     <div class="stat-card">
                         <div class="stat-label">レイノルズ数 Re</div>
-                        <div id="out-re" class="stat-value accent">0</div>
+                        <div id="out-re" class="stat-value accent">-</div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-label">流況</div>
@@ -1018,7 +1018,7 @@
             document.getElementById('s-rate').textContent = r;
             document.getElementById('s-time').textContent = simTime.toFixed(1) + ' s';
 
-            document.getElementById('out-ubulk').textContent = (p.Ubulk * p.H).toFixed(4);
+            document.getElementById('out-ubulk').textContent = (p.Ubulk * p.H).toFixed(3);
             document.getElementById('out-ustar').textContent = p.ustar.toFixed(4);
             document.getElementById('out-re').textContent = Math.round(p.Re).toFixed(0);
             document.getElementById('out-sc').textContent = (nu / p.Dm).toFixed(3);
