@@ -46,7 +46,7 @@
         }
 
         h1 {
-            font-size: 18px;
+            font-size: 24px;
             color: #222;
             margin-bottom: 0px;
         }
@@ -212,9 +212,6 @@
 
     <div class="container">
         <h1>Langevin Particle Simulator - Channel Flow</h1>
-        <p>
-            層流/乱流速度プロファイルを背景流とするLangevin確率微分方程式により粒子を追跡し、各指標を算出します。
-        </p>
 
         <div class="stats-grid">
             <div class="stat-card"><div class="stat-label">生存粒子数 N_flow</div><div id="s-alive" class="stat-value">0</div></div>
@@ -241,22 +238,22 @@
                 <div id="out-dc" class="stat-value accent">—</div>
             </div>
             <!--<div class="stat-card">
-            <div class="stat-label">dt [ms] (自動設定)</div>
-            <div id="out-dt" class="stat-value">—</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-label">subDiv / subCutoff [mm]</div>
-            <div id="out-sub" class="stat-value">—</div>
-        </div>-->
+                <div class="stat-label">dt [ms] (自動設定)</div>
+                <div id="out-dt" class="stat-value">—</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">subDiv / subCutoff [mm]</div>
+                <div id="out-sub" class="stat-value">—</div>
+            </div>-->
         </div>
 
         <div class="canvas-container">
             <div class="legends">
                 <div class="legend-item"><div style="width:10px;height:10px;border-radius:50%;background:#4a90e2"></div>活性粒子</div>
                 <div class="legend-item"><div style="width:10px;height:10px;border-radius:50%;background:#f0dc00"></div>吸着粒子</div>
-                <div class="legend-item"><div style="width:12px;height:2px;border-radius:2px;background:#5aad7a"></div>平均流速 U(y)</div>
+                <div class="legend-item"><div style="width:12px;height:4px;border-radius:2px;background:#5aad7a"></div>平均流速 U(y)</div>
                 <div class="legend-item"><div style="width:12px;height:2px;background:#ff5050"></div>相対濃度 C(y)/C_bulk</div>
-                <div class="legend-item"><div style="width:12px;height:2px;background:#999"></div>流路中心線</div>
+                <div class="legend-item"><div style="width: 12px; height: 2px; background: #999"></div>流路中心線</div>
                 <div class="legend-item"><div style="width:12px;height:2px;border-top:2px dashed #cc44cc"></div>濃度境界層 δc</div>
                 <div class="legend-item"><div style="width:12px;height:2px;border-top:2px dashed #e08020"></div>粘性底層 yv（乱流時）</div>
             </div>
@@ -293,7 +290,7 @@
                 <div class="btn-group">
                     <button id="btn-run">▶ 開始</button>
                     <button id="btn-reset" class="secondary">リセット</button>
-                    <button id="btn-view" class="secondary">平均粒子密度表示</button>
+                    <button id="btn-view" class="secondary">格子表示</button>
                 </div>
             </div>
 
@@ -325,12 +322,14 @@
                     </div>
                 </div>
                 <p style="font-size: 11px; color: var(--color-text-secondary); line-height: 1.4; margin: 0;">
-                    ※ Re=2300 を閾値として、速度分布と管摩擦係数を層流(ポアズイユ流)・乱流(対数則)に自動切替します。<br>
-                    ※ 律速指標 km/v_w が、1より小さいときは境界層律速、1より大きいときは分離膜律速となります。
+                    ・ 層流/乱流境界層を背景流とするLangevin方程式により粒子を追跡し、粒子統計により各指標を算出します。<br>
+                    ・ Re=2300 を閾値として、速度分布と管摩擦係数を層流(ポアズイユ流)・乱流(対数則)に自動切替します。<br>
+                    ・ 律速指標 km/v_wを定義することで、境界層律速(km/v_w < 1)、分離膜律速(km/v_w > 1)が判別できます。
                 </p>
             </div>
         </div>
-        <div style="margin-top: 20px; margin-bottom: 30px; display: flex; justify-content: center; align-items: center; gap: 10px;">
+
+        <div style="margin-top: 0px; margin-bottom: 0px; display: flex; justify-content: center; align-items: center; gap: 10px;">
             <span style="font-size: 13px; color: #555; font-weight: 500;">
                 If you wish to support my work,
             </span>
@@ -340,6 +339,7 @@
                      style="height: 32px !important; width: 115px !important; border-radius: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); display: block;">
             </a>
         </div>
+
         <p style="font-size: 12px; color: #888;">(c) 2026 Kazuaki Uchibori</p>
     </div>
 
@@ -582,14 +582,10 @@
                         if (Math.random() < P_absorb) {
                             dead.push({ x: Math.max(0, Math.min(pt.x, domLen)) });
                             totalDead++;
-                            const hx = Math.floor(Math.max(0, Math.min(pt.x, domLen)) / domLen * (HW - 1));
-                            for (let hy = 0; hy < Math.floor(HH * 0.15); hy++) {
-                                hmap[hy * HW + hx] += 0.3 * (1 - hy / (HH * 0.15));
-                            }
                             isDead = true;
                         } else {
                             pt.y = -pt.y;
-                            pt.vy = Math.abs(pt.vy);
+                            pt.vy = -pt.vy;
                         }
                     }
                 }
@@ -1073,7 +1069,7 @@
         });
 
         document.getElementById('btn-view').addEventListener('click', function () {
-            showMap = !showMap; this.textContent = showMap ? '粒子表示' : '平均粒子密度表示';
+            showMap = !showMap; this.textContent = showMap ? '粒子表示' : '格子表示';
             redraw();
         });
 
