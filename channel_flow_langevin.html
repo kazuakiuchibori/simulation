@@ -236,7 +236,7 @@
             </div>
 
             <div class="stat-card">
-                <div class="stat-label">濃度境界層厚さ δc = D/km [m]</div>
+                <div class="stat-label">濃度境界層厚さ δc = D/km [mm]</div>
                 <div id="out-dc" class="stat-value accent">—</div>
             </div>
             <!--<div class="stat-card">
@@ -1018,19 +1018,19 @@
             document.getElementById('s-rate').textContent = r;
             document.getElementById('s-time').textContent = simTime.toFixed(1) + ' s';
 
-            document.getElementById('out-ubulk').textContent = simTime > 0 ? (p.Ubulk * p.H).toExponential(3) : '—';
+            document.getElementById('out-ubulk').textContent = simTime > 0 ? (p.Ubulk * p.H).toFixed(4) : '—';
             document.getElementById('out-ustar').textContent = simTime > 0 ? p.ustar.toFixed(4) : '—';
             document.getElementById('out-re').textContent = Math.round(p.Re).toFixed(0);
-            document.getElementById('out-sc').textContent = simTime > 0 ? (nu / p.Dm).toFixed(1) : '—';
+            document.getElementById('out-sc').textContent = simTime > 0 ? (nu / p.Dm).toFixed(3) : '—';
             const yv = p.Re >= 2300 ? 5 * nu / p.ustar * 1000 : Infinity;
-            document.getElementById('out-yv').textContent = simTime > 0 ? (isFinite(yv) ? yv.toExponential(3) : 'N/A') : '—';
+            document.getElementById('out-yv').textContent = simTime > 0 ? (isFinite(yv) ? yv.toFixed(4) : 'N/A') : '—';
 
             const statsReady = concSamples >= 50;
             document.getElementById('out-km').textContent = statsReady ? kmValue.toExponential(3) : '—';
-            document.getElementById('out-cw').textContent = statsReady ? wallConcRatio.toFixed(3) : '—';
+            document.getElementById('out-cw').textContent = statsReady ? wallConcRatio.toFixed(4) : '—';
             const kmvw = statsReady ? (p.vw > 0 ? (kmValue / p.vw).toFixed(3) : '—') : '—';
             document.getElementById('out-kmvw').textContent = kmvw;
-            const dc = statsReady && kmValue > 0 ? (p.Dm / kmValue).toExponential(3) : '—';
+            const dc = statsReady && kmValue > 0 ? (p.Dm / kmValue * 1e3).toFixed(4) : '—';
             document.getElementById('out-dc').textContent = dc;
 
             //const ts = computeDt(p);
