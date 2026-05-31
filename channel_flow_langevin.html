@@ -216,8 +216,8 @@
         <h1>Web CFD - Langevin Dynamics Simulation: Channel Flow with Wall Adsorption</h1>
 
         <div class="stats-grid">
-            <div class="stat-card"><div class="stat-label">流動粒子数 N_flow</div><div id="s-alive" class="stat-value">0</div></div>
-            <div class="stat-card"><div class="stat-label">累計吸着数 N_wall</div><div id="s-dead" class="stat-value">0</div></div>
+            <div class="stat-card"><div class="stat-label">生存粒子数 N_live</div><div id="s-alive" class="stat-value">0</div></div>
+            <div class="stat-card"><div class="stat-label">累計吸着粒子数 N_dead</div><div id="s-dead" class="stat-value">0</div></div>
             <div class="stat-card"><div class="stat-label">吸着効率 η = N_dead/(N_dead+N_exit)</div><div id="s-rate" class="stat-value">0%</div></div>
             <div class="stat-card"><div class="stat-label">経過時間 t</div><div id="s-time" class="stat-value">0.0 s</div></div>
             <div class="stat-card">
@@ -251,7 +251,7 @@
 
         <div class="canvas-container">
             <div class="legends">
-                <div class="legend-item"><div style="width:10px;height:10px;border-radius:50%;background:#4a90e2"></div>流動粒子</div>
+                <div class="legend-item"><div style="width:10px;height:10px;border-radius:50%;background:#4a90e2"></div>生存粒子</div>
                 <div class="legend-item"><div style="width:10px;height:10px;border-radius:50%;background:#f0dc00"></div>吸着粒子</div>
                 <div class="legend-item"><div style="width:12px;height:4px;border-radius:2px;background:#5aad7a"></div>平均流速 U(y)</div>
                 <div class="legend-item"><div style="width:12px;height:2px;background:#ff5050"></div>平均濃度 C(y)</div>
