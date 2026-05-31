@@ -2,7 +2,9 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>Langevin Particle Simulator - Channel Flow</title>
+    <title>
+        Web CFD - Langevin Dynamics Simulation: Channel Flow with Wall Adsorption
+    </title>
     <style>
         :root {
             --color-background-primary: #ffffff;
@@ -211,7 +213,7 @@
 <body>
 
     <div class="container">
-        <h1>Langevin Particle Simulator - Channel Flow</h1>
+        <h1>Web CFD - Langevin Dynamics Simulation: Channel Flow with Wall Adsorption</h1>
 
         <div class="stats-grid">
             <div class="stat-card"><div class="stat-label">生存粒子数 N_flow</div><div id="s-alive" class="stat-value">0</div></div>
@@ -249,13 +251,13 @@
 
         <div class="canvas-container">
             <div class="legends">
-                <div class="legend-item"><div style="width:10px;height:10px;border-radius:50%;background:#4a90e2"></div>活性粒子</div>
+                <div class="legend-item"><div style="width:10px;height:10px;border-radius:50%;background:#4a90e2"></div>流動粒子</div>
                 <div class="legend-item"><div style="width:10px;height:10px;border-radius:50%;background:#f0dc00"></div>吸着粒子</div>
                 <div class="legend-item"><div style="width:12px;height:4px;border-radius:2px;background:#5aad7a"></div>平均流速 U(y)</div>
-                <div class="legend-item"><div style="width:12px;height:2px;background:#ff5050"></div>相対濃度 C(y)/C_bulk</div>
+                <div class="legend-item"><div style="width:12px;height:2px;background:#ff5050"></div>平均濃度 C(y)</div>
                 <div class="legend-item"><div style="width: 12px; height: 2px; background: #999"></div>流路中心線</div>
                 <div class="legend-item"><div style="width:12px;height:2px;border-top:2px dashed #cc44cc"></div>濃度境界層 δc</div>
-                <div class="legend-item"><div style="width:12px;height:2px;border-top:2px dashed #e08020"></div>粘性底層 yv（乱流時）</div>
+                <div class="legend-item"><div style="width:12px;height:2px;border-top:2px dashed #e08020"></div>粘性底層 yv（乱流時のみ）</div>
             </div>
             <canvas id="cv" width="1200" height="600"></canvas>
         </div>
