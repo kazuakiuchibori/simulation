@@ -96,7 +96,7 @@
         }
 
             .stat-value.accent {
-                color: var(--color-accent);
+                color: #1d1d1f;
             }
 
         .canvas-container {
@@ -223,12 +223,12 @@
             <div class="stat-card"><div class="stat-label">経過時間 t</div><div id="s-time" class="stat-value">0.0 s</div></div>
             <div class="stat-card">
                 <div class="stat-label">物質伝達係数 km [m/s]</div>
-                <div id="out-km" class="stat-value accent">0</div>
+                <div id="out-km" class="stat-value accent">—</div>
             </div>
 
             <div class="stat-card">
                 <div class="stat-label">濃度比 Cwall/Cbulk = km/(km+v_w)</div>
-                <div id="out-cw" class="stat-value accent">1.000</div>
+                <div id="out-cw" class="stat-value accent">—</div>
             </div>
 
             <div class="stat-card">
@@ -253,11 +253,12 @@
         <div class="canvas-container">
             <div class="legends">
                 <div class="legend-item"><div style="width:10px;height:10px;border-radius:50%;background:#4a90e2"></div>活性粒子</div>
-                <div class="legend-item"><div style="width:10px;height:10px;border-radius:50%;background:#E29004"></div>吸着粒子</div>
+                <div class="legend-item"><div style="width:10px;height:10px;border-radius:50%;background:#f0dc00"></div>吸着粒子</div>
                 <div class="legend-item"><div style="width:12px;height:4px;border-radius:2px;background:#5aad7a"></div>平均流速 U(y)</div>
                 <div class="legend-item"><div style="width:12px;height:2px;background:#ff5050"></div>相対濃度 C(y)/C_bulk</div>
                 <div class="legend-item"><div style="width: 12px; height: 2px; background: #999"></div>流路中心線</div>
-                <div id="flow-indicator" class="flow-status flow-laminar">層流 (Laminar)</div>
+                <div class="legend-item"><div style="width:12px;height:2px;border-top:2px dashed #cc44cc"></div>濃度境界層 δc</div>
+                <div class="legend-item"><div style="width:12px;height:2px;border-top:2px dashed #e08020"></div>粘性底層 yv（乱流時）</div>
             </div>
             <canvas id="cv" width="1200" height="600"></canvas>
         </div>
@@ -292,7 +293,7 @@
                 <div class="btn-group">
                     <button id="btn-run">▶ 開始</button>
                     <button id="btn-reset" class="secondary">リセット</button>
-                    <button id="btn-view" class="secondary">密度マップ表示</button>
+                    <button id="btn-view" class="secondary">平均粒子密度表示</button>
                 </div>
             </div>
 
@@ -300,19 +301,23 @@
                 <div class="stats-grid" style="grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 12px;">
                     <div class="stat-card">
                         <div class="stat-label">単位奥行流量 q [m²/s]</div>
-                        <div id="out-ubulk" class="stat-value accent">0.000</div>
+                        <div id="out-ubulk" class="stat-value accent">—</div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-label">摩擦速度 u* [m/s]</div>
-                        <div id="out-ustar" class="stat-value accent">0.000</div>
+                        <div id="out-ustar" class="stat-value accent">—</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Schmidt数 Sc = ν/Dm</div>
+                        <div id="out-sc" class="stat-value accent">—</div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-label">レイノルズ数 Re</div>
                         <div id="out-re" class="stat-value accent">0</div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-label">Schmidt数 Sc = ν/Dm</div>
-                        <div id="out-sc" class="stat-value accent">—</div>
+                        <div class="stat-label">流況</div>
+                        <div id="flow-indicator" class="stat-value" style="color:#1d1d1f;">層流</div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-label">粘性底層厚さ yv = 5ν/u* [mm]</div>
@@ -619,10 +624,6 @@
                             if (Math.random() < P_absorb) {
                                 dead.push({ x: Math.max(0, Math.min(pt.x, domLen)) });
                                 totalDead++;
-                                const hx = Math.floor(Math.max(0, Math.min(pt.x, domLen)) / domLen * (HW - 1));
-                                for (let hy = 0; hy < Math.floor(HH * 0.15); hy++) {
-                                    hmap[hy * HW + hx] += 0.3 * (1 - hy / (HH * 0.15));
-                                }
                                 isDead = true;
                                 break;
                             } else {
@@ -647,14 +648,15 @@
                     if (pt.y > delta) pt.y = delta;
                 }
 
-                const hxi = Math.floor(Math.min(pt.x, domLen - 1e-9) / domLen * (HW - 1));
-                const ly_curr = Math.log(Math.max(pt.y, yMin));
-                const ly_min = Math.log(yMin);
-                const ly_max = Math.log(delta);
-                const ratio = Math.max(0, Math.min(1, (ly_curr - ly_min) / (ly_max - ly_min)));
-                const hyi = Math.floor(ratio * (HH - 1));
-
-                hmap[(HH - 1 - hyi) * HW + hxi] += 0.03;
+                if (pt.y >= yMin) {
+                    const hxi = Math.min(HW - 1, Math.floor(Math.min(pt.x, domLen - 1e-9) / domLen * HW));
+                    const ly_curr = Math.log(pt.y);
+                    const ly_min = Math.log(yMin);
+                    const ly_max = Math.log(delta);
+                    const ratio = Math.max(0, Math.min(1 - 1e-9, (ly_curr - ly_min) / (ly_max - ly_min)));
+                    const hyi = Math.floor(ratio * HH);
+                    hmap[(HH - 1 - hyi) * HW + hxi] += 0.03;
+                }
                 keep.push(pt);
             }
             parts = keep;
@@ -759,18 +761,40 @@
             ctx.fillText(`${centerMm} mm`, MX + PW + 6, centerGy + 4);
 
             if (showMap) {
+
+                const densMap = new Float32Array(HW * HH);
+                for (let hy = 0; hy < HH; hy++) {
+                    for (let hx = 0; hx < HW; hx++) {
+                        densMap[hy * HW + hx] = hmap[hy * HW + hx];
+                    }
+                }
+
+                // 最大値を対数スケールで正規化（ダイナミックレンジを圧縮）
                 let mx = 0;
-                for (let k = 0; k < hmap.length; k++) if (hmap[k] > mx) mx = hmap[k];
+                for (let k = 0; k < densMap.length; k++) if (densMap[k] > mx) mx = densMap[k];
+
                 if (mx > 0) {
+                    const logMx = Math.log(mx);
+                    const logMin = logMx - Math.log(1000); // 3桁分のダイナミックレンジ
                     const cw = PW / HW, ch = PH / HH;
                     for (let hy = 0; hy < HH; hy++) {
                         for (let hx = 0; hx < HW; hx++) {
-                            const v = hmap[hy * HW + hx] / mx;
-                            if (v < 0.02) continue;
-                            const a = Math.min(v * 0.88, 0.88);
-                            const r = Math.round(45 + v * 140), g = Math.round(35 + v * 75), b = Math.round(210 + v * 45);
-                            ctx.fillStyle = `rgba(${r},${g},${b},${a})`;
-                            ctx.fillRect(MX + hx * cw, MY + hy * ch, cw + 0.5, ch + 0.5);
+                            const raw = densMap[hy * HW + hx];
+                            if (raw <= 0) continue;
+                            const v = Math.max(0, Math.min(1, (Math.log(raw) - logMin) / (logMx - logMin)));
+                            if (v <= 0) continue;
+
+                            // 青→白（密度高=青、密度低=白）
+                            const t = 1 - v;
+                            const r = Math.round(74 + t * (255 - 74));
+                            const g = Math.round(144 + t * (255 - 144));
+                            const b = Math.round(226 + t * (255 - 226));
+
+                            ctx.fillStyle = `rgba(${r},${g},${b},0.45)`;
+                            ctx.fillRect(MX + hx * cw, MY + hy * ch, cw, ch);
+                            ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+                            ctx.lineWidth = 0.5;
+                            ctx.strokeRect(MX + hx * cw, MY + hy * ch, cw, ch);
                         }
                     }
                 }
@@ -783,11 +807,47 @@
             drawProf(p);
             drawConcentrationProfile(delta);
 
+            // 濃度境界層 δc
+            if (concSamples >= 50 && kmValue > 0) {
+                const dc_val = p.Dm / kmValue;
+                if (dc_val < delta) {
+                    const dcY = toSY(dc_val, delta);
+                    ctx.save();
+                    ctx.strokeStyle = '#cc44cc';
+                    ctx.lineWidth = 1.5;
+                    ctx.setLineDash([6, 4]);
+                    ctx.beginPath(); ctx.moveTo(MX, dcY); ctx.lineTo(MX + PW, dcY); ctx.stroke();
+                    ctx.setLineDash([]);
+                    ctx.fillStyle = '#cc44cc';
+                    ctx.font = '11px sans-serif';
+                    ctx.fillText('δc', MX + PW + 6, dcY + 4);
+                    ctx.restore();
+                }
+            }
+
+            // 粘性底層 yv = 5ν/u*（乱流のみ）
+            if (p.Re >= 2300) {
+                const yv_val = 5 * nu / p.ustar;
+                if (yv_val < delta) {
+                    const yvY = toSY(yv_val, delta);
+                    ctx.save();
+                    ctx.strokeStyle = '#e08020';
+                    ctx.lineWidth = 1.5;
+                    ctx.setLineDash([4, 4]);
+                    ctx.beginPath(); ctx.moveTo(MX, yvY); ctx.lineTo(MX + PW, yvY); ctx.stroke();
+                    ctx.setLineDash([]);
+                    ctx.fillStyle = '#e08020';
+                    ctx.font = '11px sans-serif';
+                    ctx.fillText('yv', MX + PW + 6, yvY + 4);
+                    ctx.restore();
+                }
+            }
+
             if (!showMap) {
                 for (let i = 0; i < dead.length; i++) {
                     const d = dead[i]; const sx = toSX(d.x);
                     ctx.beginPath(); ctx.arc(sx, wallY, 2.0, 0, Math.PI * 2);
-                    ctx.fillStyle = 'rgba(226,144,4,0.5)'; ctx.fill();
+                    ctx.fillStyle = 'rgba(240,220,0,0.7)'; ctx.fill();
                 }
                 for (let i = 0; i < parts.length; i++) {
                     const pt = parts[i]; const sx = toSX(pt.x); const sy = toSY(pt.y, delta);
@@ -950,18 +1010,19 @@
             document.getElementById('s-rate').textContent = r;
             document.getElementById('s-time').textContent = simTime.toFixed(1) + ' s';
 
-            document.getElementById('out-ubulk').textContent = (p.Ubulk * p.H).toExponential(3);
-            document.getElementById('out-ustar').textContent = p.ustar.toFixed(4);
+            document.getElementById('out-ubulk').textContent = simTime > 0 ? (p.Ubulk * p.H).toExponential(3) : '—';
+            document.getElementById('out-ustar').textContent = simTime > 0 ? p.ustar.toFixed(4) : '—';
             document.getElementById('out-re').textContent = Math.round(p.Re).toFixed(0);
-            document.getElementById('out-sc').textContent = (nu / p.Dm).toFixed(1);
+            document.getElementById('out-sc').textContent = simTime > 0 ? (nu / p.Dm).toFixed(1) : '—';
             const yv = p.Re >= 2300 ? 5 * nu / p.ustar * 1000 : Infinity;
-            document.getElementById('out-yv').textContent = isFinite(yv) ? yv.toExponential(3) : '— (層流)';
+            document.getElementById('out-yv').textContent = simTime > 0 ? (isFinite(yv) ? yv.toExponential(3) : '— (層流)') : '—';
 
-            document.getElementById('out-km').textContent = kmValue.toExponential(3);
-            document.getElementById('out-cw').textContent = wallConcRatio.toFixed(3);
-            const kmvw = p.vw > 0 ? (kmValue / p.vw).toFixed(3) : '—';
+            const statsReady = concSamples >= 50;
+            document.getElementById('out-km').textContent = statsReady ? kmValue.toExponential(3) : '—';
+            document.getElementById('out-cw').textContent = statsReady ? wallConcRatio.toFixed(3) : '—';
+            const kmvw = statsReady ? (p.vw > 0 ? (kmValue / p.vw).toFixed(3) : '—') : '—';
             document.getElementById('out-kmvw').textContent = kmvw;
-            const dc = kmValue > 0 ? (p.Dm / kmValue).toExponential(3) : '—';
+            const dc = statsReady && kmValue > 0 ? (p.Dm / kmValue).toExponential(3) : '—';
             document.getElementById('out-dc').textContent = dc;
 
             //const ts = computeDt(p);
@@ -970,13 +1031,9 @@
             //    ts.subDiv + ' / ' + (ts.subCutoff * 1000).toFixed(2) + ' mm';
 
             const ind = document.getElementById('flow-indicator');
-            if (p.Re < 2300) {
-                ind.textContent = '層流 (Laminar)';
-                ind.className = 'flow-status flow-laminar';
-            } else {
-                ind.textContent = '乱流 (Turbulent)';
-                ind.className = 'flow-status flow-turbulent';
-            }
+            ind.textContent = p.Re < 2300 ? '層流' : '乱流';
+            ind.className = 'stat-value';
+            ind.style.color = '#1d1d1f';
         }
 
         let fc = 0;
@@ -1006,7 +1063,7 @@
         });
 
         document.getElementById('btn-view').addEventListener('click', function () {
-            showMap = !showMap; this.textContent = showMap ? '粒子表示' : '密度マップ表示';
+            showMap = !showMap; this.textContent = showMap ? '粒子表示' : '平均粒子密度表示';
             redraw();
         });
 
