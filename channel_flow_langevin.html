@@ -303,7 +303,7 @@
             </div>
 
             <div class="panel">
-                <div class="stats-grid" style="grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+                <div class="stats-grid" style="grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 4px;">
                     <div class="stat-card">
                         <div class="stat-label">単位奥行流量 q [m²/s]</div>
                         <div id="out-ubulk" class="stat-value accent">—</div>
@@ -329,11 +329,12 @@
                         <div id="out-vw" class="stat-value accent">—</div>
                     </div>
                 </div>
-                <p style="font-size: 11px; color: var(--color-text-secondary); line-height: 1.4; margin: 0;">
+                <p style="font-size: 11px; color: var(--color-text-secondary); line-height: 1.4; margin: 0; text-align: left;">
                     ・ 層流/乱流境界層を背景流とするLangevin方程式により粒子を追跡し、粒子統計により各指標を算出します。<br>
                     ・ Re=2300 を閾値として、速度分布と管摩擦係数を層流(Poiseuille流れ)・乱流(対数則)に自動切替します。<br>
                     ・ 透過膜前後の全圧差、膜透過度、濃度分圧から膜透過速度を自動算出します。<br>
-                    ・ 律速指標 km/v_wを定義することで、境界層律速(km/v_w &lt; 1)と分離膜律速(km/v_w &gt; 1)を判別します。
+                    ・ 律速指標 km/v_wを定義することで、境界層律速(km/v_w &lt; 1)と分離膜律速(km/v_w &gt; 1)を判別します。<br>
+                    ・ 粒子統計により算出される各指標は、生存粒子が流出面に到達した時刻から更新され始めます。
                 </p>
             </div>
         </div>
