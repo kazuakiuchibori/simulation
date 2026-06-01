@@ -48,7 +48,7 @@
         }
 
         h1 {
-            font-size: 24px;
+            font-size: 20px;
             color: #222;
             margin-bottom: 0px;
         }
@@ -236,28 +236,27 @@
             </div>
 
             <div class="stat-card">
-                <div class="stat-label">濃度境界層厚さ δc = D/km [mm]</div>
-                <div id="out-dc" class="stat-value accent">—</div>
+                <div class="stat-label">Sherwood数 Sh = km·H/D</div>
+                <div id="out-sh" class="stat-value accent">—</div>
             </div>
-            <!--<div class="stat-card">
-                <div class="stat-label">dt [ms] (自動設定)</div>
-                <div id="out-dt" class="stat-value">—</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">subDiv / subCutoff [mm]</div>
-                <div id="out-sub" class="stat-value">—</div>
-            </div>-->
         </div>
 
         <div class="canvas-container">
-            <div class="legends">
-                <div class="legend-item"><div style="width:10px;height:10px;border-radius:50%;background:#4a90e2"></div>生存粒子</div>
-                <div class="legend-item"><div style="width:10px;height:10px;border-radius:50%;background:#f0dc00"></div>吸着粒子</div>
-                <div class="legend-item"><div style="width:12px;height:4px;border-radius:2px;background:#5aad7a"></div>平均流速 U(y)</div>
-                <div class="legend-item"><div style="width:12px;height:2px;background:#ff5050"></div>平均濃度 C(y)</div>
-                <div class="legend-item"><div style="width:12px;height:2px;background:#999"></div>流路中心線</div>
-                <div class="legend-item"><div style="width:12px;height:2px;border-top:2px dashed #cc44cc"></div>濃度境界層 δc</div>
-                <div class="legend-item"><div style="width:12px;height:2px;border-top:2px dashed #e08020"></div>粘性底層 yv（乱流時のみ）</div>
+            <div class="legends" style="justify-content: space-between; align-items: center;">
+                <div style="display:flex; gap:12px; flex-wrap:wrap;">
+                    <div class="legend-item"><div style="width:10px;height:10px;border-radius:50%;background:#4a90e2"></div>生存粒子</div>
+                    <div class="legend-item"><div style="width:10px;height:10px;border-radius:50%;background:#f0dc00"></div>吸着粒子</div>
+                    <div class="legend-item"><div style="width:12px;height:4px;border-radius:2px;background:#5aad7a"></div>平均流速 U(y)</div>
+                    <div class="legend-item"><div style="width:12px;height:2px;background:#ff5050"></div>平均濃度 C(y)</div>
+                    <div class="legend-item"><div style="width:12px;height:2px;background:#999"></div>流路中心線</div>
+                    <div class="legend-item"><div style="width:12px;height:2px;border-top:2px dashed #cc44cc"></div>濃度境界層 δc</div>
+                    <div class="legend-item"><div style="width:12px;height:2px;border-top:2px dashed #e08020"></div>粘性底層 yv（乱流時のみ）</div>
+                </div>
+                <div style="display:flex; align-items:center; gap:8px; white-space:nowrap;">
+                    <label for="sl-inf" style="font-size:12px; color:var(--color-text-secondary);">流入粒子数 [1/step]</label>
+                    <input id="sl-inf" type="range" min="10" max="100" step="5" value="30" style="width:100px;">
+                    <span id="v-inf" style="font-size:12px; font-weight:600; min-width:24px;">30</span>
+                </div>
             </div>
             <canvas id="cv" width="1200" height="600"></canvas>
         </div>
@@ -266,29 +265,36 @@
             <div class="panel">
                 <div class="control-row">
                     <label for="sl-h">流路幅 H [m]</label>
-                    <input id="sl-h" type="range" min="0.01" max="0.20" step="0.01" value="0.02">
-                    <span id="v-h" class="v-val">0.02</span>
+                    <input id="sl-h" type="range" min="0.005" max="0.100" step="0.005" value="0.020">
+                    <span id="v-h" class="v-val">0.020</span>
                 </div>
                 <div class="control-row">
                     <label for="sl-q">バルク流速 U_bulk [m/s]</label>
-                    <input id="sl-q" type="range" min="0.10" max="10.0" step="0.05" value="1.00">
-                    <span id="v-q" class="v-val">1.00</span>
+                    <input id="sl-q" type="range" min="0.10" max="10.0" step="0.05" value="0.50">
+                    <span id="v-q" class="v-val">0.50</span>
                 </div>
                 <div class="control-row">
-                    <label for="sl-vw">膜透過速度 v_w [m/s]</label>
-                    <input id="sl-vw" type="range" min="0.000" max="0.100" step="0.001" value="0.010">
-                    <span id="v-vw" class="v-val">0.010</span>
+                    <label for="sl-gpu">膜透過度 [GPU]</label>
+                    <input id="sl-gpu" type="range" min="0" max="100000" step="1000" value="40000">
+                    <span id="v-gpu" class="v-val">40000</span>
                 </div>
+                <div class="control-row">
+                    <label for="sl-co2">CO₂濃度 [ppm]</label>
+                    <input id="sl-co2" type="range" min="0" max="500000" step="1000" value="10000">
+                    <span id="v-co2" class="v-val">1000</span>
+                </div>
+                <div class="control-row">
+                    <label for="sl-patm">全圧差 [atm]</label>
+                    <input id="sl-patm" type="range" min="0.0" max="10.0" step="0.1" value="1.0">
+                    <span id="v-patm" class="v-val">1.0</span>
+                </div>
+
                 <div class="control-row">
                     <label for="sl-dm">分子拡散係数 D [×10⁻⁶ m²/s]</label>
                     <input id="sl-dm" type="range" min="1" max="30" step="1" value="16">
                     <span id="v-dm" class="v-val">16</span>
                 </div>
-                <div class="control-row">
-                    <label for="sl-inf">流入粒子数 [1/step]</label>
-                    <input id="sl-inf" type="range" min="10" max="100" step="5" value="30">
-                    <span id="v-inf" class="v-val">30</span>
-                </div>
+
                 <div class="btn-group">
                     <button id="btn-run">▶ 開始</button>
                     <button id="btn-reset" class="secondary">リセット</button>
@@ -315,18 +321,19 @@
                         <div id="out-re" class="stat-value accent">-</div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-label">流況</div>
-                        <div id="flow-indicator" class="stat-value" style="color:#1d1d1f;">層流</div>
+                        <div class="stat-label">Schmidt数 Sc = ν/D</div>
+                        <div id="out-sc" class="stat-value accent">—</div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-label">Schmidt数 Sc = ν/Dm</div>
-                        <div id="out-sc" class="stat-value accent">—</div>
+                        <div class="stat-label">膜透過速度 v_w [m/s]</div>
+                        <div id="out-vw" class="stat-value accent">—</div>
                     </div>
                 </div>
                 <p style="font-size: 11px; color: var(--color-text-secondary); line-height: 1.4; margin: 0;">
                     ・ 層流/乱流境界層を背景流とするLangevin方程式により粒子を追跡し、粒子統計により各指標を算出します。<br>
-                    ・ Re=2300 を閾値として、速度分布と管摩擦係数を層流(ポアズイユ流)・乱流(対数則)に自動切替します。<br>
-                    ・ 律速指標 km/v_wを定義することで、境界層律速(km/v_w < 1)と分離膜律速(km/v_w > 1)を判別します。
+                    ・ Re=2300 を閾値として、速度分布と管摩擦係数を層流(Poiseuille流れ)・乱流(対数則)に自動切替します。<br>
+                    ・ 透過膜前後の全圧差、膜透過度、濃度分圧から膜透過速度を自動算出します。<br>
+                    ・ 律速指標 km/v_wを定義することで、境界層律速(km/v_w &lt; 1)と分離膜律速(km/v_w &gt; 1)を判別します。
                 </p>
             </div>
         </div>
@@ -362,7 +369,12 @@
         function getP() {
             const H = +document.getElementById('sl-h').value;
             const Ubulk = +document.getElementById('sl-q').value;
-            const vw = +document.getElementById('sl-vw').value;
+            const gpu = +document.getElementById('sl-gpu').value;
+            const co2ppm = +document.getElementById('sl-co2').value;
+            const patm = +document.getElementById('sl-patm').value;
+
+            const vw = gpu * 3.35e-10 * co2ppm * 1e-6 * patm * 8.314 * 298;
+
             const Dm = +document.getElementById('sl-dm').value * 1e-6;
             const nInf = +document.getElementById('sl-inf').value;
 
@@ -377,15 +389,13 @@
             }
             const ustar = Ubulk * Math.sqrt(f / 8.0);
 
-            return { H, Ubulk, vw, Dm, nInf, delta, Re, f, ustar };
+            return { H, Ubulk, vw, Dm, nInf, delta, Re, f, ustar, patm };
         }
 
         function Umean(y, p) {
             if (p.Re < 2300) {
-                // y は壁面からの距離。ポアズイユ流: U(y) = 1.5*Ubulk*(1-(1-y/delta)^2)
-                // = 1.5*Ubulk*(2*(y/delta) - (y/delta)^2)
                 const y_norm = Math.max(y, 0) / p.delta;
-                const eta = 1.0 - y_norm;           // 中心からの無次元距離
+                const eta = 1.0 - y_norm;
                 return 1.5 * p.Ubulk * (1.0 - eta * eta);
             } else {
                 const yp = p.ustar * Math.max(y, 1e-12) / nu;
@@ -418,7 +428,7 @@
         }
 
         let parts = [], dead = [], totalDead = 0, totalSpawned = 0, totalExit = 0, simTime = 0;
-        let exitConcAccum = 0.0;  // 出口通過粒子の流量重み付き濃度の累積（C_out推定用）
+        let exitConcAccum = 0.0;
 
         const NY_CONC = 240;
         let concBins = new Float64Array(NY_CONC);
@@ -430,13 +440,6 @@
         let hmap = new Float32Array(HW * HH);
         let showMap = false, running = false, rafId = null;
 
-        // ---- 適応的タイムステップ ----------------------------------------
-        // 制約(1) Langevin安定性: dt < 0.25 * TL_min  (TL_min = 壁面近傍の最小ラグランジアン時間スケール)
-        // 制約(2) 対流ドメイン横断: dt < 0.5 * domLen / Ubulk
-        // 制約(3) サブステップ拡散: dtSub < 0.25 * subCutoff^2 / (2*Dm)
-        // 制約(4) 壁面吸収精度:    dtSub < 2.0 * Dm / vw  (吸収確率の線形域)
-        // subCutoff: 粘性底層外縁(y+=5)の10倍 を基準に delta の10%を上限
-        // subDiv = ceil(dt/dtSub) を [10, 1000] にクランプ
         function computeDt(p) {
             const { Ubulk, Dm, vw, ustar, delta, Re } = p;
 
@@ -468,19 +471,14 @@
             updateDisplays(); redraw();
         }
 
-        // 流入断面 (x=0) の流量フラックス U(y) に正確に比例した粒子生成。
-        // 対数空間で離散化した累積分布関数 (CDF) を事前構築し、
-        // 一様乱数の逆関数で y をサンプリングする。
-        // これにより壁面近傍の対数ビンにも正しい粒子密度が確保される。
-        const N_CDF = 2000;  // CDF の離散点数（細かいほど壁面近傍が正確）
-        let spawnCDF = null; // { ys, cdf } キャッシュ
+        const N_CDF = 2000;
+        let spawnCDF = null;
         let spawnCDF_key = '';
 
         function buildSpawnCDF(p) {
             const key = `${p.Re.toFixed(0)}_${p.Ubulk.toFixed(6)}_${p.ustar.toFixed(8)}_${p.delta.toFixed(6)}`;
             if (spawnCDF && spawnCDF_key === key) return spawnCDF;
 
-            // 対数空間で N_CDF 点を配置
             const log_ymin = Math.log(yMin);
             const log_ymax = Math.log(p.delta);
             const ys = new Float64Array(N_CDF);
@@ -488,11 +486,9 @@
             for (let i = 0; i < N_CDF; i++) {
                 const t = (i + 0.5) / N_CDF;
                 ys[i] = Math.exp(log_ymin + t * (log_ymax - log_ymin));
-                // U(y) * dy/d(log y) = U(y) * y  が対数空間での重み
                 pdf[i] = Math.max(Umean(ys[i], p), 0) * ys[i];
             }
 
-            // 累積 → 正規化
             const cdf = new Float64Array(N_CDF);
             cdf[0] = pdf[0];
             for (let i = 1; i < N_CDF; i++) cdf[i] = cdf[i - 1] + pdf[i];
@@ -507,13 +503,11 @@
         function sampleY(cdf_obj) {
             const { ys, cdf } = cdf_obj;
             const u = Math.random();
-            // 二分探索
             let lo = 0, hi = N_CDF - 1;
             while (lo < hi) {
                 const mid = (lo + hi) >> 1;
                 if (cdf[mid] < u) lo = mid + 1; else hi = mid;
             }
-            // 区間内で線形補間
             if (lo === 0) return ys[0];
             const t = (u - cdf[lo - 1]) / Math.max(cdf[lo] - cdf[lo - 1], 1e-15);
             return ys[lo - 1] + t * (ys[lo] - ys[lo - 1]);
@@ -577,7 +571,6 @@
                         pt.x += pt.vx * dt + Math.sqrt(2 * Dm) * randn() * sdtMain;
                         pt.y += pt.vy * dt + Math.sqrt(2 * Dm) * randn() * sdtMain;
                     }
-                    // メインステップでも壁面通過を判定する
                     if (pt.y <= 0) {
                         const penetration = Math.max(-pt.y, 1e-12);
                         const P_absorb = 1.0 - Math.exp(-vw * penetration / Dm);
@@ -645,7 +638,6 @@
                 if (isDead) continue;
                 if (pt.x > domLen) {
                     totalExit++;
-                    // 出口断面でのカップ混合濃度寄与: U(y)で重み付け（正規化は後で）
                     exitConcAccum += Math.max(Umean(pt.y, p), 0);
                     continue;
                 }
@@ -769,7 +761,6 @@
             ctx.fillText(`${centerMm} mm`, MX - 48, centerGy + 4);
 
             if (showMap) {
-
                 const densMap = new Float32Array(HW * HH);
                 for (let hy = 0; hy < HH; hy++) {
                     for (let hx = 0; hx < HW; hx++) {
@@ -777,13 +768,12 @@
                     }
                 }
 
-                // 最大値を対数スケールで正規化（ダイナミックレンジを圧縮）
                 let mx = 0;
                 for (let k = 0; k < densMap.length; k++) if (densMap[k] > mx) mx = densMap[k];
 
                 if (mx > 0) {
                     const logMx = Math.log(mx);
-                    const logMin = logMx - Math.log(1000); // 3桁分のダイナミックレンジ
+                    const logMin = logMx - Math.log(1000);
                     const cw = PW / HW, ch = PH / HH;
                     for (let hy = 0; hy < HH; hy++) {
                         for (let hx = 0; hx < HW; hx++) {
@@ -792,7 +782,6 @@
                             const v = Math.max(0, Math.min(1, (Math.log(raw) - logMin) / (logMx - logMin)));
                             if (v <= 0) continue;
 
-                            // 青→白（密度高=青、密度低=白）
                             const t = 1 - v;
                             const r = Math.round(74 + t * (255 - 74));
                             const g = Math.round(144 + t * (255 - 144));
@@ -815,7 +804,7 @@
             drawProf(p);
             drawConcentrationProfile(delta);
 
-            // 濃度境界層 δc
+            // 濃度境界層 δc の描画と左側への数値表示
             if (concSamples >= 50 && kmValue > 0) {
                 const dc_val = p.Dm / kmValue;
                 if (dc_val < delta) {
@@ -828,12 +817,17 @@
                     ctx.setLineDash([]);
                     ctx.fillStyle = '#cc44cc';
                     ctx.font = '11px sans-serif';
+
+                    ctx.textAlign = 'right';
+                    ctx.fillText((dc_val * 1000).toFixed(3) + ' mm', MX - 6, dcY + 4);
+
+                    ctx.textAlign = 'left';
                     ctx.fillText('δc', MX + PW + 6, dcY + 4);
                     ctx.restore();
                 }
             }
 
-            // 粘性底層 yv = 5ν/u*（乱流のみ）
+            // 粘性底層 yv = 5ν/u*（乱流のみ）の描画と左側への数値表示
             if (p.Re >= 2300) {
                 const yv_val = 5 * nu / p.ustar;
                 if (yv_val < delta) {
@@ -846,6 +840,11 @@
                     ctx.setLineDash([]);
                     ctx.fillStyle = '#e08020';
                     ctx.font = '11px sans-serif';
+
+                    ctx.textAlign = 'right';
+                    ctx.fillText((yv_val * 1000).toFixed(3) + ' mm', MX - 6, yvY + 4);
+
+                    ctx.textAlign = 'left';
                     ctx.fillText('yv', MX + PW + 6, yvY + 4);
                     ctx.restore();
                 }
@@ -868,7 +867,6 @@
 
             ctx.fillStyle = '#1d1d1f'; ctx.font = 'bold 13px sans-serif';
             ctx.fillText('y (log scale)', MX - 75, MY - 18);
-            //ctx.fillText('吸着壁面 (0.0 mm)', MX - 75, wallY + 18);
             ctx.fillText('x [m]', MX + PW - 120, wallY + 32);
             for (let i = 0; i <= 5; i++) {
                 const xi = i / 5;
@@ -885,7 +883,6 @@
             const log_ymax_c = Math.log(p.delta);
             const dly = (log_ymax_c - log_ymin_c) / NY_CONC;
 
-            // 各ビンの粒子数をカウント
             for (let i = 0; i < parts.length; i++) {
                 const y = parts[i].y;
                 if (y <= 0) continue;
@@ -901,17 +898,14 @@
             concSamples++;
             if (concSamples < 50) return;
 
-            // 【完全修正】累積サンプル数・物理空間面積で割り、真の「単位面積あたり粒子数 (濃度)」にする
             let C_array = new Float64Array(NY_CONC);
             for (let j = 0; j < NY_CONC; j++) {
                 const y_bot = (j === 0) ? 0 : Math.exp(log_ymin_c + j * dly);
                 const y_top = Math.exp(log_ymin_c + (j + 1) * dly);
                 const dy = y_top - y_bot;
-
                 C_array[j] = (concAvgBins[j] / concSamples) / Math.max(dy * domLen, 1e-12);
             }
 
-            // バルク(カップ混合)濃度の重み付き積分
             let bulkNumer = 0, bulkDenom = 0;
             for (let j = 0; j < NY_CONC; j++) {
                 const y_j = Math.exp(log_ymin_c + (j + 0.5) * dly);
@@ -928,45 +922,15 @@
             bulkConcValue = bulkDenom > 1e-12 ? bulkNumer / bulkDenom : 1.0;
             if (bulkConcValue < 1e-12) bulkConcValue = 1e-12;
 
-            // ---- フラックス J ------------------------------------------------
             const J = totalDead / Math.max(simTime * domLen, 1e-12);
-
-            // ---- 回収効率 η --------------------------------------------------
-            // η = N_dead / (N_dead + N_exit)  ← 近似なしの正確な定義
             const passedTotal = totalDead + totalExit;
             const eta = passedTotal > 0 ? Math.min(totalDead / passedTotal, 0.9999) : 0;
 
-            // ---- km : η のみで閉じた対数平均駆動力 ----------------------------
-            // C_in/C_out = 1/(1-η) という比だけで ΔC_lm を計算できる。
-            // ΔC_lm = (C_in - C_out) / ln(C_in/C_out)
-            //       = C_out * η/(1-η) / ln(1/(1-η))
-            //       = C_out * η / ((1-η) * (-ln(1-η)))
-            //
-            // C_out の絶対値は出口通過粒子の流量重み付き平均から推定。
-            // exitConcAccum は各出口粒子の U(y) の累積和。
-            // これを totalExit で割ると「出口断面での平均U」の代理変数になる。
-            // 濃度は spawnCDF が U(y) 比例なので、入口での粒子密度は一様。
-            // → C_out/C_in = (1-η) を使い、C_out = bulkConcValue の代わりに
-            //   η から導いた比のみで km を計算する（絶対値不要）。
-            //
-            // km = J / ΔC_lm
-            //    = J * (1-η) * (-ln(1-η)) / (C_out * η)
-            //
-            // C_out ≈ bulkConcValue * (-ln(1-η)) / (η/(1-η))  は不正確なので
-            // 質量収支の別形式を使う:
-            //   J * L = Ubulk * H * (C_in - C_out) = Ubulk * H * C_out * η/(1-η)
-            //   → C_out = J * L * (1-η) / (Ubulk * H * η)
-            //   → ΔC_lm = C_out * η/((1-η)*(-ln(1-η)))
-            //            = J * L / (Ubulk * H * (-ln(1-η)))
-            //   → km = J / ΔC_lm = Ubulk * H * (-ln(1-η)) / L
-            //
-            // これは J にも Cbulk にも依存しない完全に閉じた式。
             if (eta > 1e-6) {
-                const NTU = -Math.log(1.0 - eta);   // = km*L/(Ubulk*H)
+                const NTU = -Math.log(1.0 - eta);
                 kmValue = p.Ubulk * p.H * NTU / domLen;
                 shValue = kmValue * p.H / p.Dm;
             } else {
-                // eta が非常に小さい場合は J/Cbulk で近似（NTUの線形近似）
                 if (bulkConcValue > 1e-12 && J > 0) {
                     kmValue = J / bulkConcValue;
                     shValue = kmValue * p.H / p.Dm;
@@ -976,10 +940,6 @@
                 }
             }
 
-            // ---- Cw/Cbulk : km と vw から理論式で逆算 ------------------------
-            // フラックス整合条件: J = km*(Cbulk-Cw) = vw*Cw
-            // → Cw/Cbulk = km / (km + vw)
-            // これは粒子統計に依存しないため数値的に頑健。
             if (kmValue > 0 && p.vw > 0) {
                 wallConcRatio = kmValue / (kmValue + p.vw);
             } else if (p.vw <= 0) {
@@ -988,9 +948,6 @@
                 wallConcRatio = 0.0;
             }
 
-            // Cw/Cbulk は km と vw から理論式で算出（下部の km 計算後に設定）
-
-            // 濃度境界層厚さ: 中心側から壁面方向へ走査し、C/Cbulk が 0.99 を下回る位置
             deltaC = p.delta;
             for (let j = NY_CONC - 1; j >= 0; j--) {
                 const C = C_array[j] / bulkConcValue;
@@ -1005,9 +962,11 @@
             const p = getP();
 
             document.getElementById('sl-h').value = p.H;
-            document.getElementById('v-h').textContent = p.H.toFixed(2);
+            document.getElementById('v-h').textContent = p.H.toFixed(3);
             document.getElementById('v-q').textContent = p.Ubulk.toFixed(2);
-            document.getElementById('v-vw').textContent = p.vw.toFixed(3);
+            document.getElementById('v-gpu').textContent = (+document.getElementById('sl-gpu').value).toLocaleString();
+            document.getElementById('v-co2').textContent = (+document.getElementById('sl-co2').value).toLocaleString();
+            document.getElementById('v-patm').textContent = p.patm.toFixed(1);
             document.getElementById('v-dm').textContent = (p.Dm * 1e6).toFixed(0);
             document.getElementById('v-inf').textContent = p.nInf;
 
@@ -1022,26 +981,28 @@
             document.getElementById('out-ustar').textContent = p.ustar.toFixed(4);
             const yv = p.Re >= 2300 ? 5 * nu / p.ustar * 1000 : Infinity;
             document.getElementById('out-yv').textContent = (isFinite(yv) ? yv.toFixed(4) : 'N/A');
-            document.getElementById('out-re').textContent = Math.round(p.Re).toFixed(0);
-            document.getElementById('out-sc').textContent = (nu / p.Dm).toFixed(3);
+
+            const reText = Math.round(p.Re).toFixed(0);
+            const flowType = p.Re < 2300 ? " (層流)" : " (乱流)";
+            document.getElementById('out-re').textContent = reText + flowType;
+
+            document.getElementById('out-sc').textContent = (nu / p.Dm).toFixed(1);
+            document.getElementById('out-vw').textContent = p.vw.toExponential(2);
 
             const statsReady = concSamples >= 50;
             document.getElementById('out-km').textContent = statsReady ? kmValue.toExponential(3) : '—';
             document.getElementById('out-cw').textContent = statsReady ? wallConcRatio.toFixed(3) : '—';
-            const kmvw = statsReady ? (p.vw > 0 ? (kmValue / p.vw).toFixed(3) : '—') : '—';
-            document.getElementById('out-kmvw').textContent = kmvw;
-            const dc = statsReady && kmValue > 0 ? (Math.min(p.Dm / kmValue, p.delta) * 1e3).toFixed(4) : '—';
-            document.getElementById('out-dc').textContent = dc;
 
-            //const ts = computeDt(p);
-            //document.getElementById('out-dt').textContent  = (ts.dt * 1000).toFixed(2);
-            //document.getElementById('out-sub').textContent =
-            //    ts.subDiv + ' / ' + (ts.subCutoff * 1000).toFixed(2) + ' mm';
+            let kmvwText = '—';
+            if (statsReady && p.vw > 0) {
+                const ratio = kmValue / p.vw;
+                const typeText = ratio < 1.0 ? " (境界層律速)" : " (透過膜律速)";
+                kmvwText = ratio.toFixed(3) + typeText;
+            }
+            document.getElementById('out-kmvw').textContent = kmvwText;
 
-            const ind = document.getElementById('flow-indicator');
-            ind.textContent = p.Re < 2300 ? '層流' : '乱流';
-            ind.className = 'stat-value';
-            ind.style.color = '#1d1d1f';
+            const sh = statsReady && kmValue > 0 ? shValue.toFixed(4) : '—';
+            document.getElementById('out-sh').textContent = sh;
         }
 
         let fc = 0;
@@ -1082,7 +1043,8 @@
                 if (!running) redraw();
             });
         }
-        ['sl-h', 'sl-q', 'sl-vw', 'sl-dm', 'sl-inf'].forEach(bindSlider);
+
+        ['sl-h', 'sl-q', 'sl-gpu', 'sl-co2', 'sl-patm', 'sl-dm', 'sl-inf'].forEach(bindSlider);
 
         updateDisplays();
         redraw();
