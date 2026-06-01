@@ -1030,7 +1030,7 @@
             document.getElementById('out-cw').textContent = statsReady ? wallConcRatio.toFixed(3) : '—';
             const kmvw = statsReady ? (p.vw > 0 ? (kmValue / p.vw).toFixed(3) : '—') : '—';
             document.getElementById('out-kmvw').textContent = kmvw;
-            const dc = statsReady && kmValue > 0 ? (p.Dm / kmValue * 1e3).toFixed(4) : '—';
+            const dc = statsReady && kmValue > 0 ? (Math.min(p.Dm / kmValue, p.delta) * 1e3).toFixed(4) : '—';
             document.getElementById('out-dc').textContent = dc;
 
             //const ts = computeDt(p);
