@@ -334,6 +334,7 @@
                     ・ Re=2300 を閾値として、速度分布と管摩擦係数を層流(Poiseuille流れ)・乱流(対数則)に自動切替します。<br>
                     ・ 透過膜前後の全圧差、膜透過度、濃度分圧から膜透過速度を自動算出します。<br>
                     ・ 律速指標 km/v_wを定義することで、境界層律速(km/v_w &lt; 1)と透過膜律速(km/v_w &gt; 1)を判別します。<br>
+                    ・ kmは流束加重除去効率 η = deadFlux/(deadFlux+exitFlux) と片壁吸着補正(÷2)を適用したNTU法で算出。Sh = km·H/D（H=全ギャップ幅）。<br>
                     ・ 粒子統計により算出される各指標は、生存粒子が流出面に到達した時刻から更新され始めます。
                 </p>
             </div>
@@ -430,6 +431,7 @@
 
         let parts = [], dead = [], totalDead = 0, totalSpawned = 0, totalExit = 0, simTime = 0;
         let exitConcAccum = 0.0;
+        let deadFluxAccum = 0.0;
 
         const NY_CONC = 240;
         let concBins = new Float64Array(NY_CONC);
@@ -464,7 +466,7 @@
 
         function resetAll() {
             parts = []; dead = []; totalDead = 0; totalSpawned = 0; totalExit = 0; simTime = 0;
-            exitConcAccum = 0.0;
+            exitConcAccum = 0.0; deadFluxAccum = 0.0;
             concBins.fill(0); concAvgBins.fill(0); concSamples = 0;
             wallConcRatio = 1.0; bulkConcValue = 1.0; kmValue = 0.0; shValue = 0.0; deltaC = 0.0;
             hmap = new Float32Array(HW * HH);
@@ -577,6 +579,7 @@
                         const P_absorb = 1.0 - Math.exp(-vw * penetration / Dm);
                         if (Math.random() < P_absorb) {
                             dead.push({ x: Math.max(0, Math.min(pt.x, domLen)) });
+                            deadFluxAccum += Math.max(Umean(pt.y, p), 0);
                             totalDead++;
                             isDead = true;
                         } else {
@@ -625,6 +628,7 @@
                             const P_absorb = 1.0 - Math.exp(-vw * penetration / Dm);
                             if (Math.random() < P_absorb) {
                                 dead.push({ x: Math.max(0, Math.min(pt.x, domLen)) });
+                                deadFluxAccum += Math.max(Umean(pt.y, p), 0);
                                 totalDead++;
                                 isDead = true;
                                 break;
@@ -927,9 +931,19 @@
             const passedTotal = totalDead + totalExit;
             const eta = passedTotal > 0 ? Math.min(totalDead / passedTotal, 0.9999) : 0;
 
-            if (eta > 1e-6) {
-                const NTU = -Math.log(1.0 - eta);
-                kmValue = p.Ubulk * p.H * NTU / domLen;
+            // flux-weighted removal efficiency: deadFlux / (deadFlux + exitFlux)
+            // Both accumulated since start → ratio converges as particles pass through
+            let eta_flux = eta;
+            const fluxTotal = deadFluxAccum + exitConcAccum;
+            if (fluxTotal > 1e-12) {
+                eta_flux = Math.min(deadFluxAccum / fluxTotal, 0.9999);
+            }
+
+            if (eta_flux > 1e-6) {
+                const NTU = -Math.log(1.0 - eta_flux);
+                // /2: only one wall (y=0) is absorbing
+                // Sh = km * H / Dm uses full gap H (simulator's own definition)
+                kmValue = p.Ubulk * (p.H / 2) * NTU / domLen;
                 shValue = kmValue * p.H / p.Dm;
             } else {
                 if (bulkConcValue > 1e-12 && J > 0) {
