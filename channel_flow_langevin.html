@@ -221,7 +221,7 @@
             <div class="stat-card"><div class="stat-label">吸着効率 η = N_dead/(N_dead+N_exit)</div><div id="s-rate" class="stat-value">0%</div></div>
             <div class="stat-card"><div class="stat-label">経過時間 t</div><div id="s-time" class="stat-value">0.0 s</div></div>
             <div class="stat-card">
-                <div class="stat-label">物質伝達係数 km [m/s]</div>
+                <div class="stat-label">物質伝達係数 km [m/s] (下流部)</div>
                 <div id="out-km" class="stat-value accent">—</div>
             </div>
 
@@ -236,7 +236,7 @@
             </div>
 
             <div class="stat-card">
-                <div class="stat-label">Sherwood数 Sh = km·H/D</div>
+                <div class="stat-label">Sherwood数 Sh = km·H/D (下流部)</div>
                 <div id="out-sh" class="stat-value accent">—</div>
             </div>
         </div>
@@ -247,7 +247,7 @@
                     <div class="legend-item"><div style="width:10px;height:10px;border-radius:50%;background:#4a90e2"></div>生存粒子</div>
                     <div class="legend-item"><div style="width:10px;height:10px;border-radius:50%;background:#f0dc00"></div>吸着粒子</div>
                     <div class="legend-item"><div style="width:12px;height:4px;border-radius:2px;background:#5aad7a"></div>平均流速 U(y)</div>
-                    <div class="legend-item"><div style="width:12px;height:2px;background:#ff5050"></div>平均濃度 C(y)</div>
+                    <div class="legend-item"><div style="width:12px;height:2px;background:#ff5050"></div>平均濃度 C(y) [下流部]</div>
                     <div class="legend-item"><div style="width:12px;height:2px;background:#999"></div>流路中心線</div>
                     <div class="legend-item"><div style="width:12px;height:2px;border-top:2px dashed #cc44cc"></div>濃度境界層 δc</div>
                     <div class="legend-item"><div style="width:12px;height:2px;border-top:2px dashed #e08020"></div>粘性底層 yv（乱流時のみ）</div>
@@ -334,7 +334,6 @@
                     ・ Re=2300 を閾値として、速度分布と管摩擦係数を層流(Poiseuille流れ)・乱流(対数則)に自動切替します。<br>
                     ・ 透過膜前後の全圧差、膜透過度、濃度分圧から膜透過速度を自動算出します。<br>
                     ・ 律速指標 km/v_wを定義することで、境界層律速(km/v_w &lt; 1)と透過膜律速(km/v_w &gt; 1)を判別します。<br>
-                    ・ kmは流束加重除去効率 η = deadFlux/(deadFlux+exitFlux) と片壁吸着補正(÷2)を適用したNTU法で算出。Sh = km·H/D（H=全ギャップ幅）。<br>
                     ・ 粒子統計により算出される各指標は、生存粒子が流出面に到達した時刻から更新され始めます。
                 </p>
             </div>
@@ -367,6 +366,7 @@
         const yMin = 1e-5;
 
         const TL_scale = 0.20;
+        const xSteadyMin = 0.0 * domLen;
 
         function getP() {
             const H = +document.getElementById('sl-h').value;
@@ -433,6 +433,12 @@
         let exitConcAccum = 0.0;
         let deadFluxAccum = 0.0;
 
+        // 定常判定と専用の統計変数
+        let isSteady = false;
+        let statDead = 0;
+        let statExit = 0;
+        let statSimTime = 0.0;
+
         const NY_CONC = 240;
         let concBins = new Float64Array(NY_CONC);
         let concAvgBins = new Float64Array(NY_CONC);
@@ -467,6 +473,12 @@
         function resetAll() {
             parts = []; dead = []; totalDead = 0; totalSpawned = 0; totalExit = 0; simTime = 0;
             exitConcAccum = 0.0; deadFluxAccum = 0.0;
+
+            isSteady = false;
+            statDead = 0;
+            statExit = 0;
+            statSimTime = 0.0;
+
             concBins.fill(0); concAvgBins.fill(0); concSamples = 0;
             wallConcRatio = 1.0; bulkConcValue = 1.0; kmValue = 0.0; shValue = 0.0; deltaC = 0.0;
             hmap = new Float32Array(HW * HH);
@@ -579,8 +591,11 @@
                         const P_absorb = 1.0 - Math.exp(-vw * penetration / Dm);
                         if (Math.random() < P_absorb) {
                             dead.push({ x: Math.max(0, Math.min(pt.x, domLen)) });
-                            deadFluxAccum += Math.max(Umean(pt.y, p), 0);
                             totalDead++;
+                            if (isSteady && pt.x >= xSteadyMin) {
+                                statDead++;
+                                deadFluxAccum += 1.0; // 【修正1】流速二重掛けの解消（純粋個数カウント）
+                            }
                             isDead = true;
                         } else {
                             pt.y = -pt.y;
@@ -628,8 +643,11 @@
                             const P_absorb = 1.0 - Math.exp(-vw * penetration / Dm);
                             if (Math.random() < P_absorb) {
                                 dead.push({ x: Math.max(0, Math.min(pt.x, domLen)) });
-                                deadFluxAccum += Math.max(Umean(pt.y, p), 0);
                                 totalDead++;
+                                if (isSteady && pt.x >= xSteadyMin) {
+                                    statDead++;
+                                    deadFluxAccum += 1.0; // 【修正1】流速二重掛けの解消（純粋個数カウント）
+                                }
                                 isDead = true;
                                 break;
                             } else {
@@ -642,8 +660,21 @@
 
                 if (isDead) continue;
                 if (pt.x > domLen) {
+                    if (!isSteady) {
+                        isSteady = true;
+                        concAvgBins.fill(0);
+                        concSamples = 0;
+                        deadFluxAccum = 0.0;
+                        exitConcAccum = 0.0;
+                        statDead = 0;
+                        statExit = 0;
+                        statSimTime = 0.0;
+                    }
                     totalExit++;
-                    exitConcAccum += Math.max(Umean(pt.y, p), 0);
+                    if (isSteady) {
+                        statExit++;
+                        exitConcAccum += 1.0; // 【修正1】流速二重掛けの解消（純粋個数カウント）
+                    }
                     continue;
                 }
 
@@ -669,6 +700,7 @@
 
             updateConcentrationStatistics();
             simTime += dt;
+            if (isSteady) statSimTime += dt;
             if (dead.length > 2000) dead.splice(0, dead.length - 2000);
         }
 
@@ -714,7 +746,9 @@
                 const y_top = Math.exp(log_ymin_d + (j + 1) * dly);
                 const dy = y_top - y_bot;
 
-                const C_val = (concAvgBins[j] / concSamples) / Math.max(dy * domLen, 1e-12);
+                // 下流区間のみの有効サンプリング体積 (0.3 * domLen)
+                const effectiveVol = dy * (domLen - xSteadyMin);
+                const C_val = (concAvgBins[j] / concSamples) / Math.max(effectiveVol, 1e-12);
                 const C_ratio = C_val / Math.max(bulkConcValue, 1e-12);
 
                 const y_center = Math.exp(log_ymin_d + (j + 0.5) * dly);
@@ -809,7 +843,7 @@
             drawProf(p);
             drawConcentrationProfile(delta);
 
-            // 濃度境界層 δc の描画と左側への数値表示
+            // 濃度境界層 δc の描画
             if (concSamples >= 50 && kmValue > 0) {
                 const dc_val = p.Dm / kmValue;
                 if (dc_val < delta) {
@@ -832,7 +866,7 @@
                 }
             }
 
-            // 粘性底層 yv = 5ν/u*（乱流のみ）の描画と左側への数値表示
+            // 粘性底層 yv = 5ν/u*（乱流のみ）の描画
             if (p.Re >= 2300) {
                 const yv_val = 5 * nu / p.ustar;
                 if (yv_val < delta) {
@@ -889,6 +923,7 @@
             const dly = (log_ymax_c - log_ymin_c) / NY_CONC;
 
             for (let i = 0; i < parts.length; i++) {
+                if (parts[i].x < xSteadyMin) continue;
                 const y = parts[i].y;
                 if (y <= 0) continue;
                 const ly = Math.log(Math.max(y, yMin));
@@ -897,6 +932,8 @@
                 concBins[j]++;
             }
 
+            if (!isSteady) return;
+
             for (let j = 0; j < NY_CONC; j++) {
                 concAvgBins[j] += concBins[j];
             }
@@ -904,11 +941,12 @@
             if (concSamples < 50) return;
 
             let C_array = new Float64Array(NY_CONC);
+            const subLength = domLen - xSteadyMin;
             for (let j = 0; j < NY_CONC; j++) {
                 const y_bot = (j === 0) ? 0 : Math.exp(log_ymin_c + j * dly);
                 const y_top = Math.exp(log_ymin_c + (j + 1) * dly);
                 const dy = y_top - y_bot;
-                C_array[j] = (concAvgBins[j] / concSamples) / Math.max(dy * domLen, 1e-12);
+                C_array[j] = (concAvgBins[j] / concSamples) / Math.max(dy * subLength, 1e-12);
             }
 
             let bulkNumer = 0, bulkDenom = 0;
@@ -927,33 +965,34 @@
             bulkConcValue = bulkDenom > 1e-12 ? bulkNumer / bulkDenom : 1.0;
             if (bulkConcValue < 1e-12) bulkConcValue = 1e-12;
 
-            const J = totalDead / Math.max(simTime * domLen, 1e-12);
-            const passedTotal = totalDead + totalExit;
-            const eta = passedTotal > 0 ? Math.min(totalDead / passedTotal, 0.9999) : 0;
-
-            // flux-weighted removal efficiency: deadFlux / (deadFlux + exitFlux)
-            // Both accumulated since start → ratio converges as particles pass through
-            let eta_flux = eta;
+            // 【修正1】流速二重掛けを完全に排した、純粋な個数ベースでの除去効率 η の算出
             const fluxTotal = deadFluxAccum + exitConcAccum;
+            let eta_flux = 0;
             if (fluxTotal > 1e-12) {
                 eta_flux = Math.min(deadFluxAccum / fluxTotal, 0.9999);
             }
 
-            if (eta_flux > 1e-6) {
-                const NTU = -Math.log(1.0 - eta_flux);
-                // /2: only one wall (y=0) is absorbing
-                // Sh = km * H / Dm uses full gap H (simulator's own definition)
-                kmValue = p.Ubulk * (p.H / 2) * NTU / domLen;
-                shValue = kmValue * p.H / p.Dm;
-            } else {
-                if (bulkConcValue > 1e-12 && J > 0) {
-                    kmValue = J / bulkConcValue;
-                    shValue = kmValue * p.H / p.Dm;
-                } else {
-                    kmValue = 0;
-                    shValue = 0;
-                }
-            }
+            const Jw =
+                statDead /
+                Math.max(statSimTime * subLength, 1e-12);
+
+            // 壁面濃度
+            const Cw =
+                p.vw > 1e-20
+                    ? Jw / p.vw
+                    : bulkConcValue;
+
+            // 物質伝達係数
+            const dC = Math.max(
+                bulkConcValue - Cw,
+                1e-20
+            );
+
+            kmValue = Jw / dC;
+            shValue = kmValue * p.H / p.Dm;
+
+            // 表示用
+            wallConcRatio = Cw / bulkConcValue;
 
             if (kmValue > 0 && p.vw > 0) {
                 wallConcRatio = kmValue / (kmValue + p.vw);
@@ -987,8 +1026,9 @@
 
             document.getElementById('s-alive').textContent = parts.length;
             document.getElementById('s-dead').textContent = totalDead;
-            const passed = totalDead + totalExit;
-            const r = passed > 0 ? (totalDead / passed * 100).toFixed(1) + '%' : '0%';
+
+            const totalStatCount = statDead + statExit;
+            const r = totalStatCount > 0 ? (statDead / totalStatCount * 100).toFixed(1) + '%' : '0%';
             document.getElementById('s-rate').textContent = r;
             document.getElementById('s-time').textContent = simTime.toFixed(3) + ' s';
 
