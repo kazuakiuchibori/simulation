@@ -1,0 +1,1168 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>Web CFD - Bluff Body</title>
+    <style>
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            background: #fafafa;
+            color: #333;
+            text-align: center;
+            margin: 0;
+            padding: 10px 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            font-size: 22px;
+            color: #222;
+            margin-bottom: 5px;
+        }
+
+        p {
+            font-size: 13px;
+            color: #666;
+            margin-top: 0;
+            margin-bottom: 15px;
+        }
+
+        .control-panel {
+            background: white;
+            padding: 10px 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            margin-bottom: 15px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+
+        .control-group {
+            text-align: left;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .highlight-group {
+            border-left: 3px solid navy;
+            padding-left: 10px;
+        }
+
+        .cfd-group {
+            border-left: 3px solid grey;
+            padding-left: 10px;
+        }
+
+        .diag-group {
+            border-left: 3px solid brown;
+            padding-left: 10px;
+        }
+
+        label {
+            font-weight: bold;
+            font-size: 11px;
+            display: block;
+            margin-bottom: 3px;
+            color: #555;
+        }
+
+        .input-item {
+            margin-bottom: 6px;
+        }
+
+            .input-item:last-child {
+                margin-bottom: 0;
+            }
+
+        input[type="number"], select, button {
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        input[type="number"], select, button {
+            padding: 4px 6px;
+            font-size: 12px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            background: white;
+        }
+
+        button {
+            background: #9b59b6;
+            color: white;
+            border: none;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+            button:hover {
+                background: #8e44ad;
+            }
+
+            button:active {
+                background: #7d3c98;
+            }
+
+        .btn-cfd {
+            background: #e67e22;
+        }
+
+            .btn-cfd:hover {
+                background: #d35400;
+            }
+
+        .btn-container {
+            display: flex;
+            gap: 5px;
+        }
+
+        canvas {
+            background: #ffffff;
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
+            box-shadow: 0 6px 16px rgba(0,0,0,0.08);
+            max-width: 100%;
+            height: auto;
+            cursor: grab;
+        }
+
+            canvas:active {
+                cursor: grabbing;
+            }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Web CFD - Bluff Body</h1>
+        <p>The unsteady flow around a bluff body is simulated, solving the incompressible 2D Navier-Stokes equations via the Finite Difference Method (FDM).</p>
+
+        <div class="control-panel">
+            <div class="control-group highlight-group">
+                <div class="input-item">
+                    <label for="shapeSelect">Shape Geometry:</label>
+                    <select id="shapeSelect">
+                        <option value="2">Line (N=2)</option>
+                        <option value="3">Triangle (N=3)</option>
+                        <option value="4">Square (N=4)</option>
+                        <option value="6">Hexagon (N=6)</option>
+                        <option value="1000" selected>Circle</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="control-group cfd-group">
+                <div class="input-item">
+                    <label for="reInput">Reynolds number (100~1000000):</label>
+                    <input type="number" id="reInput" min="100" max="1000000" step="100" value="1000">
+                </div>
+                <div class="input-item">
+                    <label for="aoaRange">Angle of attack degrees (-180~180):</label>
+                    <input type="number" id="aoaNum" min="-180" max="180" step="0.5" value="0.0">
+                </div>
+            </div>
+
+            <div class="control-group diag-group">
+                <div class="input-item">
+                    <label>Simulation:</label>
+                    <div class="btn-container">
+                        <button id="toggleCfdBtn" class="btn-cfd">Start</button>
+                        <button id="resetCfdBtn" style="background:#7f8c8d;">Refresh</button>
+                    </div>
+                </div>
+                <div class="input-item">
+                    <label for="viewModeSelect">Visualization:</label>
+                    <select id="viewModeSelect">
+                        <option value="meshOnly">Computational grid</option>
+                        <option value="velocity" selected>Velocity magnitude</option>
+                        <option value="pressure">Pressure</option>
+                        <option value="vorticity">Vorticity</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <canvas id="gridCanvas" width="1200" height="600"></canvas>
+
+        <div style="margin-top: 10px; margin-bottom: 10px; display: flex; justify-content: center; align-items: center; gap: 10px;">
+            <span style="font-size: 13px; color: #555; font-weight: 500;">
+                If you wish to support my work,
+            </span>
+            <a href="https://www.buymeacoffee.com/kazuakiuchibori" target="_blank" style="display: inline-block; vertical-align: middle;">
+                <img src="https://cdn.buymeacoffee.com/buttons/v2/default-violet.png"
+                     alt="Buy Me A Coffee"
+                     style="height: 32px !important; width: 115px !important; border-radius: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); display: block;">
+            </a>
+        </div>
+        <p style="font-size: 12px; color: #888;">(c) 2026 Kazuaki Uchibori</p>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gridCanvas');
+        const ctx = canvas.getContext('2d');
+
+        const viewModeSelect = document.getElementById('viewModeSelect');
+        const toggleCfdBtn = document.getElementById('toggleCfdBtn');
+        const resetCfdBtn = document.getElementById('resetCfdBtn');
+
+        const reInput = document.getElementById('reInput');
+        const aoaNum = document.getElementById('aoaNum');
+
+        const shapeSelect = document.getElementById('shapeSelect');
+        const radiusInput = { value: '0.5' }; // 半径は0.5に固定
+
+        let scale = 500.0;
+        let offsetX = canvas.width / 2 - 50;
+        let offsetY = canvas.height / 2;
+        let isDragging = false;
+        let startX = 0;
+        let startY = 0;
+
+        // 格子データ（Reから自動決定）
+        let imax = 60, jmax = 120;
+        let gridX = null, gridY = null;
+
+        // 格子用楕円方程式パラメータ（Reから自動決定）
+        let currentAStrength = 0.40;
+        let currentBDecay = 0.10;
+
+        // 流れ場
+        let uFlow = null;
+        let vFlow = null;
+        let pFlow = null;
+        let uFlowTmp = null;
+        let vFlowTmp = null;
+
+        // 幾何学メトリック
+        let metrics = null;
+
+        // CFD設定パラメータ
+        let isCfdRunning = false;
+        let dt = 0.0001;
+        let targetCFL = 0.5; // 固定CFL（可変dt制御）
+        let Re = 10000;
+        const U_inf = 1.0;
+        let Alpha_AoA = 8.0 * Math.PI / 180.0;
+
+        // 経過時間・ステップ数の追跡用変数
+        let cfdStepCount = 0;
+        let cfdTotalTime = 0.0;
+
+        let maxCflGlobal = 0.0;
+        let maxDiffGlobal = 0.0;
+
+        const rotCenterX = -0.4;
+        const rotCenterY = 0.0;
+
+        function updateCfdParamsFromUi() {
+            let rawRe = parseFloat(reInput.value);
+            if (isNaN(rawRe)) rawRe = 10000;
+
+            Re = Math.max(100, Math.min(1000000, rawRe));
+            reInput.value = Re;
+
+            // Reの変更に合わせて自動決定
+            const logRe = Math.log10(Re);
+            imax = Math.round(logRe * 16);
+            jmax = Math.round(logRe * 32);
+
+            const deg = parseFloat(aoaNum.value) || 0.0;
+            Alpha_AoA = deg * Math.PI / 180.0;
+
+            currentAStrength = 0.2 + 0.02 * logRe;
+            currentBDecay = 0.2 - 0.02 * logRe;
+        }
+
+        const getIdx = (i, j) => {
+            const period = jmax - 1;
+            let wrapJ = j % period;
+            if (wrapJ < 0) wrapJ += period;
+            return i * jmax + wrapJ;
+        };
+
+
+        function generateRegularPolygonSurface(theta, N = 6, radius = 0.5) {
+            const twoPi = 2.0 * Math.PI;
+
+            while (theta < 0.0) theta += twoPi;
+            while (theta >= twoPi) theta -= twoPi;
+
+            const sector = twoPi / N;
+
+            const k = Math.floor(theta / sector);
+
+            const theta0 = k * sector;
+            const theta1 = (k + 1) * sector;
+
+            const vx0 = radius * Math.cos(theta0);
+            const vy0 = radius * Math.sin(theta0);
+
+            const vx1 = radius * Math.cos(theta1);
+            const vy1 = radius * Math.sin(theta1);
+
+            let t = (theta - theta0) / sector;
+
+            // 頂点集中
+            t = 0.5 * (1.0 - Math.cos(Math.PI * t));
+
+            return {
+                x: vx0 + (vx1 - vx0) * t,
+                y: vy0 + (vy1 - vy0) * t
+            };
+        }
+
+        function generateInitialAlgebraicGrid() {
+            gridX = new Float64Array(imax * jmax);
+            gridY = new Float64Array(imax * jmax);
+
+            const polygonSides = parseInt(shapeSelect.value) || 4;
+            const polygonRadius = parseFloat(radiusInput.value) || 0.5;
+
+            const rRatio = 25.0;
+            const max_r = rRatio;
+
+            for (let j = 0; j < jmax; j++) {
+                const s = j / (jmax - 1);
+
+                const theta = 2.0 * Math.PI * s;
+
+                const surf =
+                    generateRegularPolygonSurface(
+                        theta,
+                        polygonSides,
+                        polygonRadius
+                    );
+
+                const x_surf = surf.x;
+                const y_surf = surf.y;
+
+                //
+                // O-grid放射方向
+                //
+                const nx = Math.cos(theta);
+                const ny = Math.sin(theta);
+
+                for (let i = 0; i < imax; i++) {
+                    const t = i / (imax - 1);
+
+                    const current_r =
+                        max_r *
+                        (Math.exp(3.0 * t) - 1.0) /
+                        (Math.exp(3.0) - 1.0);
+
+                    const idx = i * jmax + j;
+
+                    gridX[idx] =
+                        x_surf + nx * current_r;
+
+                    gridY[idx] =
+                        y_surf + ny * current_r;
+                }
+            }
+
+            //
+            // 周期境界
+            //
+            for (let i = 0; i < imax; i++) {
+                gridX[i * jmax + (jmax - 1)] =
+                    gridX[i * jmax + 0];
+
+                gridY[i * jmax + (jmax - 1)] =
+                    gridY[i * jmax + 0];
+            }
+
+            if (
+                uFlow === null ||
+                uFlow.length !== imax * jmax
+            ) {
+                initCfdBuffers();
+            }
+        }
+
+        function smoothGridElliptic() {
+            if (!gridX || !gridY) return;
+            const w = 1.5;
+            const tolerance = 1e-3;
+            const wakeStrength = 0.00; // 後流集中強度
+
+            for (let iter = 0; iter < 1000; iter++) {
+                let maxChange = 0.0;
+
+                for (let i = 1; i < imax - 1; i++) {
+                    for (let j = 0; j < jmax - 1; j++) {
+                        const idx = getIdx(i, j);
+                        const idx_ip = getIdx(i + 1, j), idx_im = getIdx(i - 1, j);
+                        const idx_jp = getIdx(i, j + 1), idx_jm = getIdx(i, j - 1);
+                        const idx_ipjp = getIdx(i + 1, j + 1), idx_ipjm = getIdx(i + 1, j - 1);
+                        const idx_imjp = getIdx(i - 1, j + 1), idx_imjm = getIdx(i - 1, j - 1);
+
+                        const x_xi = 0.5 * (gridX[idx_ip] - gridX[idx_im]);
+                        const y_xi = 0.5 * (gridY[idx_ip] - gridY[idx_im]);
+                        const x_eta = 0.5 * (gridX[idx_jp] - gridX[idx_jm]);
+                        const y_eta = 0.5 * (gridY[idx_jp] - gridY[idx_jm]);
+
+                        const alpha = x_eta * x_eta + y_eta * y_eta;
+                        const beta = x_xi * x_eta + y_xi * y_eta;
+                        const gamma = x_xi * x_xi + y_xi * y_xi;
+
+                        const x_xi_eta = 0.25 * (gridX[idx_ipjp] - gridX[idx_ipjm] - gridX[idx_imjp] + gridX[idx_imjm]);
+                        const y_xi_eta = 0.25 * (gridY[idx_ipjp] - gridY[idx_ipjm] - gridY[idx_imjp] + gridY[idx_imjm]);
+
+                        const theta = 2.0 * Math.PI * j / (jmax - 1);
+                        const P = -currentAStrength * Math.exp(-currentBDecay * i);
+                        const Q = wakeStrength * Math.sin(theta - Math.PI);
+
+                        const denominator = 2.0 * (alpha + gamma);
+                        if (denominator === 0) continue;
+
+                        const targetX = (
+                            alpha * (gridX[idx_ip] + gridX[idx_im]) +
+                            gamma * (gridX[idx_jp] + gridX[idx_jm]) -
+                            2.0 * beta * x_xi_eta +
+                            alpha * P * x_xi +
+                            gamma * Q * x_eta
+                        ) / denominator;
+
+                        const targetY = (
+                            alpha * (gridY[idx_ip] + gridY[idx_im]) +
+                            gamma * (gridY[idx_jp] + gridY[idx_jm]) -
+                            2.0 * beta * y_xi_eta +
+                            alpha * P * y_xi +
+                            gamma * Q * y_eta
+                        ) / denominator;
+
+                        const dx = w * (targetX - gridX[idx]);
+                        const dy = w * (targetY - gridY[idx]);
+
+                        const change = Math.max(Math.abs(dx), Math.abs(dy));
+                        if (change > maxChange) {
+                            maxChange = change;
+                        }
+
+                        gridX[idx] += dx;
+                        gridY[idx] += dy;
+                    }
+                }
+
+                for (let i = 0; i < imax; i++) {
+                    gridX[i * jmax + (jmax - 1)] = gridX[i * jmax + 0];
+                    gridY[i * jmax + (jmax - 1)] = gridY[i * jmax + 0];
+                }
+
+                if (maxChange < tolerance) {
+                    break;
+                }
+            }
+            computeMetrics();
+        }
+
+        function computeMetrics() {
+            const size = imax * jmax;
+            metrics = {
+                xi_x: new Float64Array(size), xi_y: new Float64Array(size),
+                eta_x: new Float64Array(size), eta_y: new Float64Array(size),
+                J: new Float64Array(size),
+                alpha: new Float64Array(size), beta: new Float64Array(size), gamma: new Float64Array(size)
+            };
+
+            for (let i = 0; i < imax; i++) {
+                for (let j = 0; j < jmax - 1; j++) {
+                    const idx = getIdx(i, j);
+                    const ip = getIdx(Math.min(imax - 1, i + 1), j);
+                    const im = getIdx(Math.max(0, i - 1), j);
+                    const ipp = getIdx(Math.min(imax - 1, i + 2), j);
+                    const imm = getIdx(Math.max(0, i - 2), j);
+                    const jp = getIdx(i, j + 1);
+                    const jm = getIdx(i, j - 1);
+                    const jpp = getIdx(i, j + 2);
+                    const jmm = getIdx(i, j - 2);
+
+                    let x_xi, y_xi;
+                    if (i >= 2 && i <= imax - 3) {
+                        x_xi = (- gridX[ipp] + 8.0 * gridX[ip] - 8.0 * gridX[im] + gridX[imm]) / 12.0;
+                        y_xi = (- gridY[ipp] + 8.0 * gridY[ip] - 8.0 * gridY[im] + gridY[imm]) / 12.0;
+                    } else {
+                        x_xi = 0.5 * (gridX[ip] - gridX[im]);
+                        y_xi = 0.5 * (gridY[ip] - gridY[im]);
+                    }
+
+                    const x_eta = (- gridX[jpp] + 8.0 * gridX[jp] - 8.0 * gridX[jm] + gridX[jmm]) / 12.0;
+                    const y_eta = (- gridY[jpp] + 8.0 * gridY[jp] - 8.0 * gridY[jm] + gridY[jmm]) / 12.0;
+
+                    const Jac = x_xi * y_eta - x_eta * y_xi;
+                    metrics.J[idx] = Jac;
+
+                    const invJ = 1.0 / Jac;
+                    metrics.xi_x[idx] = y_eta * invJ;
+                    metrics.xi_y[idx] = -x_eta * invJ;
+                    metrics.eta_x[idx] = -y_xi * invJ;
+                    metrics.eta_y[idx] = x_xi * invJ;
+
+                    metrics.alpha[idx] = x_eta * x_eta + y_eta * y_eta;
+                    metrics.beta[idx] = x_xi * x_eta + y_xi * y_eta;
+                    metrics.gamma[idx] = x_xi * x_xi + y_xi * y_xi;
+                }
+            }
+        }
+
+        function initCfdBuffers() {
+            const size = imax * jmax;
+            uFlow = new Float64Array(size);
+            vFlow = new Float64Array(size);
+            pFlow = new Float64Array(size);
+            uFlowTmp = new Float64Array(size);
+            vFlowTmp = new Float64Array(size);
+            rhsU = new Float64Array(size);
+            rhsV = new Float64Array(size);
+            JU = new Float64Array(size);
+            JV = new Float64Array(size);
+            src = new Float64Array(size);
+
+            const u_init = U_inf * Math.cos(Alpha_AoA);
+            const v_init = U_inf * Math.sin(Alpha_AoA);
+
+            for (let i = 0; i < size; i++) {
+                uFlow[i] = u_init;
+                vFlow[i] = v_init;
+                pFlow[i] = 0.0;
+            }
+
+            maxCflGlobal = 0.0;
+            maxDiffGlobal = 0.0;
+
+            cfdStepCount = 0;
+            cfdTotalTime = 0.0;
+
+            computeMetrics();
+        }
+
+        function computeStabilityParameters(idx) {
+            const U = metrics.xi_x[idx] * uFlow[idx] + metrics.xi_y[idx] * vFlow[idx];
+            const V = metrics.eta_x[idx] * uFlow[idx] + metrics.eta_y[idx] * vFlow[idx];
+            const cfl = (Math.abs(U) + Math.abs(V)) * dt;
+
+            const J2 = metrics.J[idx] ** 2;
+            const diff = ((metrics.alpha[idx] + metrics.gamma[idx]) / (J2 * Re)) * dt;
+            return { cfl, diff };
+        }
+
+        function computeAdaptiveDt() {
+            if (!metrics || !uFlow || !vFlow) return;
+            let maxConv = 0.0;
+            let maxDiff = 0.0;
+            for (let i = 1; i < imax - 1; i++) {
+                for (let j = 0; j < jmax - 1; j++) {
+                    const idx = getIdx(i, j);
+                    const U = metrics.xi_x[idx] * uFlow[idx] + metrics.xi_y[idx] * vFlow[idx];
+                    const V = metrics.eta_x[idx] * uFlow[idx] + metrics.eta_y[idx] * vFlow[idx];
+                    const conv = Math.abs(U) + Math.abs(V);
+                    if (conv > maxConv) maxConv = conv;
+                    const J2 = metrics.J[idx] ** 2;
+                    if (J2 > 1.0e-24) {
+                        const diff = (metrics.alpha[idx] + metrics.gamma[idx]) / (J2 * Re);
+                        if (diff > maxDiff) maxDiff = diff;
+                    }
+                }
+            }
+            let dtNew = 1.0;
+            if (maxConv > 1.0e-12) dtNew = Math.min(dtNew, targetCFL / maxConv);
+            dt = dtNew;
+        }
+
+        function stepFlowSolver() {
+            const u_inf_x = U_inf * Math.cos(Alpha_AoA);
+            const u_inf_y = U_inf * Math.sin(Alpha_AoA);
+
+            for (let j = 0; j < jmax; j++) {
+                uFlow[getIdx(0, j)] = 0.0;
+                vFlow[getIdx(0, j)] = 0.0;
+            }
+            for (let j = 0; j < jmax; j++) {
+                uFlow[getIdx(imax - 1, j)] = u_inf_x;
+                vFlow[getIdx(imax - 1, j)] = u_inf_y;
+            }
+
+            let localMaxCfl = 0.0;
+            let localMaxDiff = 0.0;
+            for (let i = 1; i < imax - 1; i++) {
+                for (let j = 0; j < jmax - 1; j++) {
+                    const idx = getIdx(i, j);
+                    const stab = computeStabilityParameters(idx);
+                    if (stab.cfl > localMaxCfl) localMaxCfl = stab.cfl;
+                    if (stab.diff > localMaxDiff) localMaxDiff = stab.diff;
+                }
+            }
+            maxCflGlobal = localMaxCfl;
+            maxDiffGlobal = localMaxDiff;
+
+            computeAdaptiveDt();
+
+            cfdStepCount++;
+            cfdTotalTime += dt;
+
+            for (let i = 1; i < imax - 1; i++) {
+                for (let j = 0; j < jmax - 1; j++) {
+                    const idx = getIdx(i, j);
+                    const ip = getIdx(i + 1, j), im = getIdx(i - 1, j);
+                    const jp = getIdx(i, j + 1), jm = getIdx(i, j - 1);
+                    const ipjp = getIdx(i + 1, j + 1), ipjm = getIdx(i + 1, j - 1);
+                    const imjp = getIdx(i - 1, j + 1), imjm = getIdx(i - 1, j - 1);
+                    const ipp = getIdx(i + 2, j), imm = getIdx(i - 2, j);
+                    const jpp = getIdx(i, j + 2), jmm = getIdx(i, j - 2);
+
+                    const U = metrics.xi_x[idx] * uFlow[idx] + metrics.xi_y[idx] * vFlow[idx];
+                    const V = metrics.eta_x[idx] * uFlow[idx] + metrics.eta_y[idx] * vFlow[idx];
+
+                    let u_xi, v_xi, u_eta, v_eta;
+
+                    if (i === 1) {
+                        if (U > 0.0) {
+                            u_xi = (uFlow[ip] - uFlow[im]) * 0.5;
+                            v_xi = (vFlow[ip] - vFlow[im]) * 0.5;
+                        } else {
+                            u_xi = (-uFlow[ipp] + 4.0 * uFlow[ip] - 3.0 * uFlow[idx]) * 0.5;
+                            v_xi = (-vFlow[ipp] + 4.0 * vFlow[ip] - 3.0 * vFlow[idx]) * 0.5;
+                        }
+                    } else if (i === imax - 2) {
+                        if (U > 0.0) {
+                            u_xi = (3.0 * uFlow[idx] - 4.0 * uFlow[im] + uFlow[imm]) * 0.5;
+                            v_xi = (3.0 * vFlow[idx] - 4.0 * vFlow[im] + vFlow[imm]) * 0.5;
+                        } else {
+                            u_xi = (uFlow[ip] - uFlow[im]) * 0.5;
+                            v_xi = (vFlow[ip] - vFlow[im]) * 0.5;
+                        }
+                    } else {
+                        if (U > 0.0) {
+                            u_xi = (uFlow[ipp] + 4.0 * uFlow[ip] + 18.0 * uFlow[idx] - 28.0 * uFlow[im] + 5.0 * uFlow[imm]) / 24.0;
+                            v_xi = (vFlow[ipp] + 4.0 * vFlow[ip] + 18.0 * vFlow[idx] - 28.0 * vFlow[im] + 5.0 * vFlow[imm]) / 24.0;
+                        } else {
+                            u_xi = (-5.0 * uFlow[ipp] + 28.0 * uFlow[ip] - 18.0 * uFlow[idx] - 4.0 * uFlow[im] - uFlow[imm]) / 24.0;
+                            v_xi = (-5.0 * vFlow[ipp] + 28.0 * vFlow[ip] - 18.0 * vFlow[idx] - 4.0 * vFlow[im] - vFlow[imm]) / 24.0;
+                        }
+                    }
+
+                    if (V > 0.0) {
+                        u_eta = (uFlow[jpp] + 4.0 * uFlow[jp] + 18.0 * uFlow[idx] - 28.0 * uFlow[jm] + 5.0 * uFlow[jmm]) / 24.0;
+                        v_eta = (vFlow[jpp] + 4.0 * vFlow[jp] + 18.0 * vFlow[idx] - 28.0 * vFlow[jm] + 5.0 * vFlow[jmm]) / 24.0;
+                    } else {
+                        u_eta = (-5.0 * uFlow[jpp] + 28.0 * uFlow[jp] - 18.0 * uFlow[idx] - 4.0 * uFlow[jm] - uFlow[jmm]) / 24.0;
+                        v_eta = (-5.0 * vFlow[jpp] + 28.0 * vFlow[jp] - 18.0 * vFlow[idx] - 4.0 * vFlow[jm] - vFlow[jmm]) / 24.0;
+                    }
+
+                    const ab_u = U * u_xi + V * u_eta;
+                    const ab_v = U * v_xi + V * v_eta;
+
+                    rhsU[idx] = uFlow[idx] + dt * -ab_u;
+                    rhsV[idx] = vFlow[idx] + dt * -ab_v;
+                }
+            }
+
+            for (let j = 0; j < jmax; j++) {
+                rhsU[getIdx(0, j)] = 0.0;
+                rhsV[getIdx(0, j)] = 0.0;
+            }
+            for (let j = 0; j < jmax; j++) {
+                rhsU[getIdx(imax - 1, j)] = u_inf_x;
+                rhsV[getIdx(imax - 1, j)] = u_inf_y;
+            }
+
+            uFlowTmp.set(rhsU);
+            vFlowTmp.set(rhsV);
+
+            const omega_u = 1.0;
+
+            for (let iter = 0; iter < 10; iter++) {
+                for (let i = 1; i < imax - 1; i++) {
+                    for (let j = 0; j < jmax - 1; j++) {
+                        const idx = getIdx(i, j);
+                        const ip = getIdx(i + 1, j), im = getIdx(i - 1, j);
+                        const jp = getIdx(i, j + 1), jm = getIdx(i, j - 1);
+                        const ipjp = getIdx(i + 1, j + 1), ipjm = getIdx(i + 1, j - 1);
+                        const imjp = getIdx(i - 1, j + 1), imjm = getIdx(i - 1, j - 1);
+
+                        const u_xi_eta = 0.25 * (uFlowTmp[ipjp] - uFlowTmp[ipjm] - uFlowTmp[imjp] + uFlowTmp[imjm]);
+                        const v_xi_eta = 0.25 * (vFlowTmp[ipjp] - vFlowTmp[ipjm] - vFlowTmp[imjp] + vFlowTmp[imjm]);
+
+                        const J2 = metrics.J[idx] ** 2;
+                        const ax = dt * metrics.alpha[idx] / (J2 * Re);
+                        const ay = dt * metrics.gamma[idx] / (J2 * Re);
+                        const abeta = dt * metrics.beta[idx] / (J2 * Re);
+
+                        const denom = 1.0 + 2.0 * ax + 2.0 * ay;
+
+                        const uTarget = (rhsU[idx] + ax * (uFlowTmp[ip] + uFlowTmp[im]) + ay * (uFlowTmp[jp] + uFlowTmp[jm]) - 2.0 * abeta * u_xi_eta) / denom;
+                        const vTarget = (rhsV[idx] + ax * (vFlowTmp[ip] + vFlowTmp[im]) + ay * (vFlowTmp[jp] + vFlowTmp[jm]) - 2.0 * abeta * v_xi_eta) / denom;
+
+                        uFlowTmp[idx] += omega_u * (uTarget - uFlowTmp[idx]);
+                        vFlowTmp[idx] += omega_u * (vTarget - vFlowTmp[idx]);
+                    }
+                }
+            }
+
+            for (let i = 0; i < imax; i++) {
+                for (let j = 0; j < jmax; j++) {
+                    const idx = getIdx(i, j);
+                    const J = metrics.J[idx];
+                    JU[idx] = J * (metrics.xi_x[idx] * uFlowTmp[idx] + metrics.xi_y[idx] * vFlowTmp[idx]);
+                    JV[idx] = J * (metrics.eta_x[idx] * uFlowTmp[idx] + metrics.eta_y[idx] * vFlowTmp[idx]);
+                }
+            }
+
+            for (let i = 1; i < imax - 1; i++) {
+                for (let j = 0; j < jmax - 1; j++) {
+                    const idx = getIdx(i, j);
+                    const ip = getIdx(i + 1, j), im = getIdx(i - 1, j);
+                    const jp = getIdx(i, j + 1), jm = getIdx(i, j - 1);
+                    const ipp = getIdx(i + 2, j), imm = getIdx(i - 2, j);
+                    const jpp = getIdx(i, j + 2), jmm = getIdx(i, j - 2);
+                    const J = metrics.J[idx];
+
+                    let dJU_dxi;
+                    if (i >= 2 && i <= imax - 3) {
+                        dJU_dxi = (- JU[ipp] + 8.0 * JU[ip] - 8.0 * JU[im] + JU[imm]) / 12.0;
+                    } else {
+                        dJU_dxi = (JU[ip] - JU[im]) / 2.0;
+                    }
+
+                    const dJV_deta = (- JV[jpp] + 8.0 * JV[jp] - 8.0 * JV[jm] + JV[jmm]) / 12.0;
+
+                    src[idx] = (dJU_dxi + dJV_deta) / J / dt;
+                }
+            }
+
+            const omega_p = 1.8;
+
+            for (let iter = 0; iter < 30; iter++) {
+                for (let i = 1; i < imax - 1; i++) {
+                    for (let j = 0; j < jmax - 1; j++) {
+                        const idx = getIdx(i, j);
+                        const ip = getIdx(i + 1, j), im = getIdx(i - 1, j);
+                        const jp = getIdx(i, j + 1), jm = getIdx(i, j - 1);
+                        const ipjp = getIdx(i + 1, j + 1), ipjm = getIdx(i + 1, j - 1);
+                        const imjp = getIdx(i - 1, j + 1), imjm = getIdx(i - 1, j - 1);
+
+                        const pc_xi_eta = 0.25 * (pFlow[ipjp] - pFlow[ipjm] - pFlow[imjp] + pFlow[imjm]);
+                        const denom = 2.0 * (metrics.alpha[idx] + metrics.gamma[idx]);
+
+                        const target = (
+                            metrics.alpha[idx] * (pFlow[ip] + pFlow[im])
+                            + metrics.gamma[idx] * (pFlow[jp] + pFlow[jm])
+                            - 2.0 * metrics.beta[idx] * pc_xi_eta
+                            - (metrics.J[idx] ** 2) * src[idx]
+                        ) / denom;
+
+                        pFlow[idx] += omega_p * (target - pFlow[idx]);
+                    }
+                }
+
+                for (let j = 0; j < jmax; j++) {
+                    pFlow[getIdx(0, j)] = pFlow[getIdx(1, j)];
+                }
+            }
+
+            for (let i = 1; i < imax - 1; i++) {
+                for (let j = 0; j < jmax - 1; j++) {
+                    const idx = getIdx(i, j);
+                    const ip = getIdx(i + 1, j), im = getIdx(i - 1, j);
+                    const jp = getIdx(i, j + 1), jm = getIdx(i, j - 1);
+                    const pc_xi = 0.5 * (pFlow[ip] - pFlow[im]);
+                    const pc_eta = 0.5 * (pFlow[jp] - pFlow[jm]);
+
+                    uFlow[idx] = uFlowTmp[idx] - dt * (metrics.xi_x[idx] * pc_xi + metrics.eta_x[idx] * pc_eta);
+                    vFlow[idx] = vFlowTmp[idx] - dt * (metrics.xi_y[idx] * pc_xi + metrics.eta_y[idx] * pc_eta);
+                }
+            }
+
+            for (let i = 0; i < imax; i++) {
+                uFlow[i * jmax + (jmax - 1)] = uFlow[i * jmax + 0];
+                vFlow[i * jmax + (jmax - 1)] = vFlow[i * jmax + 0];
+                pFlow[i * jmax + (jmax - 1)] = pFlow[i * jmax + 0];
+            }
+        }
+
+        function getDiscreteColor(value, minV, maxV, mode) {
+            let norm = (value - minV) / (maxV - minV || 1.0);
+            norm = Math.min(1.0, Math.max(0.0, norm));
+            const bands = 10000;
+            norm = Math.floor(norm * bands) / bands;
+
+            let r = 0, g = 0, b = 0;
+            if (mode === 'colormap_velocity') {
+                if (norm < 0.125) { r = 0; g = 0; b = 180; }   // 濃青
+                else if (norm < 0.250) { r = 80; g = 80; b = 255; }   // 青
+                else if (norm < 0.375) { r = 180; g = 180; b = 255; }   // 薄青
+                else if (norm < 0.500) { r = 240; g = 240; b = 255; }   // 白に近い青
+                else if (norm < 0.625) { r = 255; g = 240; b = 240; }   // 白に近い赤
+                else if (norm < 0.750) { r = 255; g = 180; b = 180; }   // 薄赤
+                else if (norm < 0.875) { r = 255; g = 80; b = 80; }   // 赤
+                else { r = 180; g = 0; b = 0; }                     // 濃赤
+            }
+            else if (mode === 'colormap_pressure') {
+                if (norm < 0.0909) { r = 200; g = 0; b = 200; } // 1. マゼンタ [-2.00 ～ -1.75]
+                else if (norm < 0.1818) { r = 110; g = 0; b = 220; } // 2. 濃い紫   [-1.75 ～ -1.50]
+                else if (norm < 0.2727) { r = 0; g = 60; b = 240; } // 3. 濃い青   [-1.50 ～ -1.25]
+                else if (norm < 0.3636) { r = 0; g = 140; b = 255; } // 4. 青       [-1.25 ～ -1.00]
+                else if (norm < 0.4545) { r = 0; g = 210; b = 255; } // 5. 水色     [-1.00 ～ -0.75]
+                else if (norm < 0.5455) { r = 0; g = 200; b = 150; } // 6. 青緑     [-0.75 ～ -0.50]
+                else if (norm < 0.6364) { r = 0; g = 160; b = 70; } // 7. 深い緑   [-0.50 ～ -0.25]
+                else if (norm < 0.7273) { r = 130; g = 200; b = 60; } // 8. 薄い緑   [-0.25 ～  0.00]
+                else if (norm < 0.8182) { r = 200; g = 200; b = 30; } // 9. 黄色     [ 0.00 ～ +0.25]
+                else if (norm < 0.9091) { r = 240; g = 120; b = 20; } // 10. オレンジ[+0.25 ～ +0.50]
+                else { r = 240; g = 10; b = 10; } // 11. 濃い赤  [+0.50 ～ +0.75]
+            }
+            else if (mode === 'colormap_vorticity') {
+                if (norm < 0.100) { r = 100; g = 0; b = 200; }
+                else if (norm < 0.250) { r = 0; g = 100; b = 255; }
+                else if (norm < 0.450) { r = 0; g = 220; b = 255; }
+                else if (norm < 0.550) { r = 127; g = 127; b = 127; }
+                else if (norm < 0.750) { r = 240; g = 230; b = 0; }
+                else if (norm < 0.900) { r = 255; g = 110; b = 0; }
+                else { r = 255; g = 0; b = 0; }
+            }
+            return `rgba(${r}, ${g}, ${b}, 0.82)`;
+        }
+
+        function getRotatedPos(rawX, rawY) {
+            const cosA = Math.cos(-Alpha_AoA);
+            const sinA = Math.sin(-Alpha_AoA);
+            const dx = rawX - rotCenterX;
+            const dy = rawY - rotCenterY;
+            return {
+                x: offsetX + (rotCenterX + (dx * cosA - dy * sinA)) * scale,
+                y: offsetY - (rotCenterY + (dx * sinA + dy * cosA)) * scale
+            };
+        }
+
+        function computeForceCoefficients() {
+            if (!metrics || !pFlow || !uFlow || !vFlow || !gridX || !gridY) return null;
+            let Fx_p = 0.0, Fy_p = 0.0;
+            let Fx_v = 0.0, Fy_v = 0.0;
+
+            for (let j = 0; j < jmax - 1; j++) {
+                const idx0_j = getIdx(0, j);
+                const idx0_j1 = getIdx(0, j + 1);
+                const idx1_j = getIdx(1, j);
+                const idx1_j1 = getIdx(1, j + 1);
+                const idx2_j = getIdx(2, j);
+                const idx2_j1 = getIdx(2, j + 1);
+
+                // --- 表面セグメントの幾何学データ ---
+                const dx = gridX[idx0_j1] - gridX[idx0_j];
+                const dy = gridY[idx0_j1] - gridY[idx0_j];
+                const nx_ds = dy;
+                const ny_ds = -dx;
+                const ds_geom = Math.sqrt(nx_ds * nx_ds + ny_ds * ny_ds);
+                if (ds_geom < 1e-12) continue;
+                const nx_norm = nx_ds / ds_geom;
+                const ny_norm = ny_ds / ds_geom;
+
+                // --- 圧力抵抗 ---
+                const p_face = 0.5 * (pFlow[idx0_j] + pFlow[idx0_j1]);
+                Fx_p += -p_face * nx_ds;
+                Fy_p += -p_face * ny_ds;
+
+                // --- 法線方向距離（面中心で平均） ---
+                const h1 = 0.5 * (
+                    (gridX[idx1_j] - gridX[idx0_j]) * nx_norm + (gridY[idx1_j] - gridY[idx0_j]) * ny_norm +
+                    (gridX[idx1_j1] - gridX[idx0_j1]) * nx_norm + (gridY[idx1_j1] - gridY[idx0_j1]) * ny_norm
+                );
+                const h2 = 0.5 * (
+                    (gridX[idx2_j] - gridX[idx0_j]) * nx_norm + (gridY[idx2_j] - gridY[idx0_j]) * ny_norm +
+                    (gridX[idx2_j1] - gridX[idx0_j1]) * nx_norm + (gridY[idx2_j1] - gridY[idx0_j1]) * ny_norm
+                );
+                if (Math.abs(h1) < 1e-12 || Math.abs(h2 - h1) < 1e-12) continue;
+
+                // --- 面中心速度 ---
+                const u1 = 0.5 * (uFlow[idx1_j] + uFlow[idx1_j1]);
+                const v1 = 0.5 * (vFlow[idx1_j] + vFlow[idx1_j1]);
+                const u2 = 0.5 * (uFlow[idx2_j] + uFlow[idx2_j1]);
+                const v2 = 0.5 * (vFlow[idx2_j] + vFlow[idx2_j1]);
+
+                // --- 2次精度片側差分（非等間隔格子） ---
+                const denom = h1 * h2 * (h2 - h1);
+                const du_dn = (h2 * h2 * u1 - h1 * h1 * u2) / denom;
+                const dv_dn = (h2 * h2 * v1 - h1 * h1 * v2) / denom;
+
+                // --- 粘性抵抗 ---
+                // no-slip 壁面上で ∂u/∂s = ∂v/∂s = 0 が厳密に成立するため
+                // 応力テンソルの壁面力は法線勾配のみで表現される：
+                //   fx = (1/Re) * [ (1+nx²)*du_dn + nx*ny*dv_dn ]
+                //   fy = (1/Re) * [ nx*ny*du_dn + (1+ny²)*dv_dn ]
+                const inv_Re = 1.0 / Re;
+                const nx2 = nx_norm * nx_norm;
+                const ny2 = ny_norm * ny_norm;
+                const nxny = nx_norm * ny_norm;
+                Fx_v += inv_Re * (du_dn * (1.0 + nx2) + dv_dn * nxny) * ds_geom;
+                Fy_v += inv_Re * (dv_dn * (1.0 + ny2) + du_dn * nxny) * ds_geom;
+            }
+
+            // --- 揚力・抗力への変換 ---
+            const Fx = Fx_p + Fx_v;
+            const Fy = Fy_p + Fy_v;
+            const cosA = Math.cos(Alpha_AoA);
+            const sinA = Math.sin(Alpha_AoA);
+            const F_drag = Fx * cosA + Fy * sinA;
+            const F_lift = -Fx * sinA + Fy * cosA;
+            return {
+                CL: 2.0 * F_lift,
+                CD: 2.0 * F_drag
+            };
+        }
+
+        function renderGrid() {
+            if (!gridX || !gridY) return;
+            const viewMode = viewModeSelect.value;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            if (viewMode !== 'meshOnly') {
+                for (let i = 0; i < imax - 1; i++) {
+                    for (let j = 0; j < jmax - 1; j++) {
+                        const idx00 = getIdx(i, j), idx10 = getIdx(i + 1, j);
+                        const idx11 = getIdx(i + 1, j + 1), idx01 = getIdx(i, j + 1);
+
+                        const p00 = getRotatedPos(gridX[idx00], gridY[idx00]);
+                        const p10 = getRotatedPos(gridX[idx10], gridY[idx10]);
+                        const p11 = getRotatedPos(gridX[idx11], gridY[idx11]);
+                        const p01 = getRotatedPos(gridX[idx01], gridY[idx01]);
+
+                        let color = "rgba(200,200,200,0.5)";
+
+                        if (viewMode === 'velocity' && uFlow && vFlow) {
+                            const u = 0.25 * (uFlow[idx00] + uFlow[idx10] + uFlow[idx11] + uFlow[idx01]);
+                            const v = 0.25 * (vFlow[idx00] + vFlow[idx10] + vFlow[idx11] + vFlow[idx01]);
+                            color = getDiscreteColor(Math.hypot(u, v), 0.0, U_inf * 2.0, 'colormap_velocity');
+
+                        } else if (viewMode === 'pressure' && pFlow) {
+                            const p = 0.25 * (pFlow[idx00] + pFlow[idx10] + pFlow[idx11] + pFlow[idx01]);
+                            color = getDiscreteColor(p, -2.0, 0.75, 'colormap_pressure');
+
+                        } else if (viewMode === 'vorticity' && uFlow && vFlow) {
+                            function clamp(v, vmin, vmax) { return Math.max(vmin, Math.min(vmax, v)); }
+                            function getVorticity(ii, jj) {
+                                const ic = clamp(ii, 1, imax - 2);
+                                const jc = clamp(jj, 1, jmax - 2);
+
+                                const idx_ip = getIdx(ic + 1, jc);
+                                const idx_im = getIdx(ic - 1, jc);
+                                const idx_jp = getIdx(ic, jc + 1);
+                                const idx_jm = getIdx(ic, jc - 1);
+
+                                const x_xi = 0.5 * (gridX[idx_ip] - gridX[idx_im]);
+                                const y_xi = 0.5 * (gridY[idx_ip] - gridY[idx_im]);
+                                const x_eta = 0.5 * (gridX[idx_jp] - gridX[idx_jm]);
+                                const y_eta = 0.5 * (gridY[idx_jp] - gridY[idx_jm]);
+
+                                const J = x_xi * y_eta - x_eta * y_xi;
+                                if (Math.abs(J) < 1.0e-12) return 0.0;
+
+                                const u_xi = 0.5 * (uFlow[idx_ip] - uFlow[idx_im]);
+                                const u_eta = 0.5 * (uFlow[idx_jp] - uFlow[idx_jm]);
+                                const v_xi = 0.5 * (vFlow[idx_ip] - vFlow[idx_im]);
+                                const v_eta = 0.5 * (vFlow[idx_jp] - vFlow[idx_jm]);
+
+                                const dv_dx = (y_eta * v_xi - y_xi * v_eta) / J;
+                                const du_dy = (-x_eta * u_xi + x_xi * u_eta) / J;
+
+                                return dv_dx - du_dy;
+                            }
+
+                            const vort = 0.25 * (getVorticity(i, j) + getVorticity(i + 1, j) + getVorticity(i + 1, j + 1) + getVorticity(i, j + 1));
+                            color = getDiscreteColor(vort, -10.0, 10.0, 'colormap_vorticity');
+                        }
+
+                        ctx.fillStyle = color;
+                        ctx.beginPath();
+                        ctx.moveTo(p00.x, p00.y);
+                        ctx.lineTo(p10.x, p10.y);
+                        ctx.lineTo(p11.x, p11.y);
+                        ctx.lineTo(p01.x, p01.y);
+                        ctx.closePath();
+                        ctx.fill();
+                    }
+                }
+            }
+
+            ctx.strokeStyle = (viewMode === 'meshOnly') ? '#000000' : 'rgba(127, 127, 127, 0.01)';
+            ctx.lineWidth = 1.0;
+
+            for (let i = 0; i < imax; i++) {
+                ctx.beginPath();
+                for (let j = 0; j < jmax; j++) {
+                    const idx = i * jmax + j;
+                    const pt = getRotatedPos(gridX[idx], gridY[idx]);
+                    if (j === 0) ctx.moveTo(pt.x, pt.y);
+                    else ctx.lineTo(pt.x, pt.y);
+                }
+                ctx.stroke();
+            }
+
+            for (let j = 0; j < jmax; j++) {
+                ctx.beginPath();
+                for (let i = 0; i < imax; i++) {
+                    const idx = i * jmax + j;
+                    const pt = getRotatedPos(gridX[idx], gridY[idx]);
+                    if (i === 0) ctx.moveTo(pt.x, pt.y);
+                    else ctx.lineTo(pt.x, pt.y);
+                }
+                ctx.stroke();
+            }
+
+            ctx.strokeStyle = '#000000';
+            ctx.lineWidth = 1.0;
+            ctx.beginPath();
+            for (let j = 0; j < jmax; j++) {
+                const pt = getRotatedPos(gridX[j], gridY[j]);
+                if (j === 0) ctx.moveTo(pt.x, pt.y);
+                else ctx.lineTo(pt.x, pt.y);
+            }
+            ctx.stroke();
+
+            const polygonSides = parseInt(shapeSelect.value) || 4;
+            let shapeName = `N=${polygonSides}`;
+            if (polygonSides === 2) shapeName = "Line";
+            else if (polygonSides >= 32) shapeName = "Circle";
+            else if (polygonSides === 4) shapeName = "Square";
+
+            ctx.fillStyle = "rgba(0, 0, 0, 0.8)";
+            ctx.fillRect(15, 15, 245, 125);
+            ctx.strokeStyle = "rgba(255, 255, 255, 0.2)";
+            ctx.lineWidth = 1;
+            ctx.strokeRect(15, 15, 245, 125);
+
+            ctx.font = "bold 13px 'Courier New', monospace";
+
+            ctx.fillStyle = "#ffffff";
+            ctx.fillText(`${shapeName}`, 25, 35);
+            ctx.fillText(`Grid: ${imax}*${jmax}`, 135, 35);
+
+            ctx.fillStyle = "#ffffff";
+            const currentAoaDeg = (Alpha_AoA * 180.0 / Math.PI).toFixed(1);
+            ctx.fillText(`AoA: ${currentAoaDeg}°`, 25, 57);
+            ctx.fillStyle = "#ffffff";
+            ctx.fillText(`Re: ${Re}`, 135, 57);
+
+            ctx.fillStyle = (maxCflGlobal > 1.0) ? "#ff4d4d" : (maxCflGlobal > 0.5) ? "#ffcc00" : "#00ff66";
+            ctx.fillText(`CFL: ${maxCflGlobal.toFixed(3)}`, 25, 79);
+            ctx.fillStyle = (maxDiffGlobal > 1.0) ? "#ff4d4d" : (maxDiffGlobal > 0.1) ? "#ffcc00" : "#00ff66";
+            ctx.fillText(`Diff: ${maxDiffGlobal.toFixed(3)}`, 135, 79);
+
+            ctx.fillStyle = "#ffffff";
+            ctx.fillText(`t: ${cfdTotalTime.toFixed(5)}`, 25, 101);
+            ctx.fillText(`dt: ${dt.toExponential(2)}`, 135, 101);
+
+            const coeffs = computeForceCoefficients();
+            if (coeffs) {
+                ctx.fillStyle = "#88ccff";
+                ctx.fillText(`CL: ${coeffs.CL.toFixed(4)}`, 25, 123);
+                ctx.fillStyle = "#ffaa88";
+                ctx.fillText(`CD: ${coeffs.CD.toFixed(4)}`, 135, 123);
+            }
+        }
+
+        function updateAndRender() {
+            updateCfdParamsFromUi();
+            generateInitialAlgebraicGrid();
+            smoothGridElliptic();
+            initCfdBuffers();
+            renderGrid();
+        }
+
+        viewModeSelect.addEventListener('change', renderGrid);
+
+        reInput.addEventListener('change', () => {
+            let rawRe = parseFloat(reInput.value);
+            if (isNaN(rawRe)) rawRe = 10000;
+            reInput.value = Math.max(100, Math.min(1000000, rawRe));
+            updateAndRender();
+        });
+        reInput.addEventListener('input', () => {
+            const validRe = parseInt(reInput.value);
+            if (isNaN(validRe) || validRe < 100 || validRe > 1000000) return;
+            updateAndRender();
+        });
+
+        aoaNum.addEventListener('input', () => {
+            const deg = parseFloat(aoaNum.value);
+            if (isNaN(deg) || deg < -180 || deg > 180) return;
+            updateAndRender();
+        });
+        aoaNum.addEventListener('change', () => {
+            let deg = parseFloat(aoaNum.value);
+            if (isNaN(deg)) deg = 0.0;
+            aoaNum.value = Math.max(-180, Math.min(180, deg));
+            updateAndRender();
+        });
+
+        // 形状設定UI用のイベントリスナー
+        [shapeSelect].forEach(input => {
+            input.addEventListener('input', () => {
+                generateInitialAlgebraicGrid();
+                smoothGridElliptic();
+                renderGrid();
+            });
+
+            input.addEventListener('change', () => {
+                updateAndRender();
+            });
+        });
+
+        function cfdLoop() {
+            if (!isCfdRunning) return;
+            for (let step = 0; step < 3; step++) {
+                stepFlowSolver();
+            }
+            renderGrid();
+            requestAnimationFrame(cfdLoop);
+        }
+
+        toggleCfdBtn.addEventListener('click', () => {
+            isCfdRunning = !isCfdRunning;
+            if (isCfdRunning) {
+                toggleCfdBtn.innerText = "Stop";
+                toggleCfdBtn.style.background = "#c0392b";
+                cfdLoop();
+            } else {
+                toggleCfdBtn.innerText = "Start";
+                toggleCfdBtn.style.background = "#e67e22";
+            }
+        });
+
+        resetCfdBtn.addEventListener('click', () => {
+            initCfdBuffers();
+            renderGrid();
+        });
+
+        canvas.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left, mouseY = e.clientY - rect.top;
+
+            const physX = (mouseX - offsetX) / scale;
+            const physY = (offsetY - mouseY) / scale;
+            if (e.deltaY < 0) scale = Math.min(10000, scale * 1.1);
+            else scale = Math.max(10, scale / 1.1);
+            offsetX = mouseX - physX * scale; offsetY = mouseY + physY * scale;
+            renderGrid();
+        });
+
+        canvas.addEventListener('mousedown', (e) => { isDragging = true; startX = e.clientX; startY = e.clientY; });
+        canvas.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+            offsetX += e.clientX - startX; offsetY += e.clientY - startY;
+            startX = e.clientX; startY = e.clientY;
+            renderGrid();
+        });
+        window.addEventListener('mouseup', () => { isDragging = false; });
+
+        // 初期実行
+        updateAndRender();
+    </script>
+</body>
+</html>
