@@ -409,7 +409,7 @@
 
             for (let j = 0; j < jmax; j++) {
                 let s = j / (jmax - 1);
-                const amp = 0.02; // 後縁集中強度
+                const amp = 0.00; // 後縁集中強度
                 s = s - amp * Math.sin(2.0 * Math.PI * s);
                 const theta = 2.0 * Math.PI * s;
                 let x_norm = 0.5 * (1.0 + Math.cos(theta));
