@@ -701,20 +701,20 @@
                         }
                     } else {
                         if (U > 0.0) {
-                            u_xi = (uFlow[ipp] - 2.0 * uFlow[ip] + 9.0 * uFlow[idx] - 10.0 * uFlow[im] + 2.0 * uFlow[imm]) / 6.0;
-                            v_xi = (vFlow[ipp] - 2.0 * vFlow[ip] + 9.0 * vFlow[idx] - 10.0 * vFlow[im] + 2.0 * vFlow[imm]) / 6.0;
+                            u_xi = (uFlow[ipp] + 4.0 * uFlow[ip] + 18.0 * uFlow[idx] - 28.0 * uFlow[im] + 5.0 * uFlow[imm]) / 24.0;
+                            v_xi = (vFlow[ipp] + 4.0 * vFlow[ip] + 18.0 * vFlow[idx] - 28.0 * vFlow[im] + 5.0 * vFlow[imm]) / 24.0;
                         } else {
-                            u_xi = (-2.0 * uFlow[ipp] + 10.0 * uFlow[ip] - 9.0 * uFlow[idx] + 2.0 * uFlow[im] - uFlow[imm]) / 6.0;
-                            v_xi = (-2.0 * vFlow[ipp] + 10.0 * vFlow[ip] - 9.0 * vFlow[idx] + 2.0 * vFlow[im] - vFlow[imm]) / 6.0;
+                            u_xi = (-5.0 * uFlow[ipp] + 28.0 * uFlow[ip] - 18.0 * uFlow[idx] - 4.0 * uFlow[im] - uFlow[imm]) / 24.0;
+                            v_xi = (-5.0 * vFlow[ipp] + 28.0 * vFlow[ip] - 18.0 * vFlow[idx] - 4.0 * vFlow[im] - vFlow[imm]) / 24.0;
                         }
                     }
 
                     if (V > 0.0) {
-                        u_eta = (uFlow[jpp] - 2.0 * uFlow[jp] + 9.0 * uFlow[idx] - 10.0 * uFlow[jm] + 2.0 * uFlow[jmm]) / 6.0;
-                        v_eta = (vFlow[jpp] - 2.0 * vFlow[jp] + 9.0 * vFlow[idx] - 10.0 * vFlow[jm] + 2.0 * vFlow[jmm]) / 6.0;
+                        u_eta = (uFlow[jpp] + 4.0 * uFlow[jp] + 18.0 * uFlow[idx] - 28.0 * uFlow[jm] + 5.0 * uFlow[jmm]) / 24.0;
+                        v_eta = (vFlow[jpp] + 4.0 * vFlow[jp] + 18.0 * vFlow[idx] - 28.0 * vFlow[jm] + 5.0 * vFlow[jmm]) / 24.0;
                     } else {
-                        u_eta = (-2.0 * uFlow[jpp] + 10.0 * uFlow[jp] - 9.0 * uFlow[idx] + 2.0 * uFlow[jm] - uFlow[jmm]) / 6.0;
-                        v_eta = (-2.0 * vFlow[jpp] + 10.0 * vFlow[jp] - 9.0 * vFlow[idx] + 2.0 * vFlow[jm] - vFlow[jmm]) / 6.0;
+                        u_eta = (-5.0 * uFlow[jpp] + 28.0 * uFlow[jp] - 18.0 * uFlow[idx] - 4.0 * uFlow[jm] - uFlow[jmm]) / 24.0;
+                        v_eta = (-5.0 * vFlow[jpp] + 28.0 * vFlow[jp] - 18.0 * vFlow[idx] - 4.0 * vFlow[jm] - vFlow[jmm]) / 24.0;
                     }
 
                     const ab_u = U * u_xi + V * u_eta;
@@ -903,7 +903,6 @@
 
         function computeForceCoefficients() {
             if (!metrics || !pFlow || !uFlow || !vFlow || !gridX || !gridY) return null;
-
             let Fx_p = 0.0, Fy_p = 0.0;
             let Fx_v = 0.0, Fy_v = 0.0;
 
@@ -912,73 +911,66 @@
                 const idx0_j1 = getIdx(0, j + 1);
                 const idx1_j = getIdx(1, j);
                 const idx1_j1 = getIdx(1, j + 1);
+                const idx2_j = getIdx(2, j);
+                const idx2_j1 = getIdx(2, j + 1);
 
-                // --- 表面セグメントの幾何学データの算出 ---
+                // --- 表面セグメントの幾何学データ ---
                 const dx = gridX[idx0_j1] - gridX[idx0_j];
                 const dy = gridY[idx0_j1] - gridY[idx0_j];
-
-                // 流体側を向く法線ベクトル（面積分用）
                 const nx_ds = dy;
                 const ny_ds = -dx;
-                // セグメントの厳密な長さ
                 const ds_geom = Math.sqrt(nx_ds * nx_ds + ny_ds * ny_ds);
-
                 if (ds_geom < 1e-12) continue;
-
-                const p_face = 0.5 * (pFlow[idx1_j] + pFlow[idx1_j1]);
-                Fx_p += -p_face * nx_ds;
-                Fy_p += -p_face * ny_ds;
-
-                // 壁から第1層目（idx1）への格子線ベクトルの長さ
-                const delta_x_j = gridX[idx1_j] - gridX[idx0_j];
-                const delta_y_j = gridY[idx1_j] - gridY[idx0_j];
-                const delta_x_j1 = gridX[idx1_j1] - gridX[idx0_j1];
-                const delta_y_j1 = gridY[idx1_j1] - gridY[idx0_j1];
-
-                const ds_j = Math.sqrt(delta_x_j * delta_x_j + delta_y_j * delta_y_j);
-                const ds_j1 = Math.sqrt(delta_x_j1 * delta_x_j1 + delta_y_j1 * delta_y_j1);
-
-                if (ds_j < 1e-12 || ds_j1 < 1e-12) continue;
-
-                const du_dn_j = uFlow[idx1_j] / ds_j;
-                const dv_dn_j = vFlow[idx1_j] / ds_j;
-                const du_dn_j1 = uFlow[idx1_j1] / ds_j1;
-                const dv_dn_j1 = vFlow[idx1_j1] / ds_j1;
-
-                // 面の中心での勾配
-                const du_dn = 0.5 * (du_dn_j + du_dn_j1);
-                const dv_dn = 0.5 * (dv_dn_j + dv_dn_j1);
-
-                // --- 3. テンソル射影（修正B：厳密な幾何学法線ベクトルの使用） ---
-                // 格子線の方向(n_xi_x等)ではなく、実際の翼表面に対する厳密な法線ベクトル(長さ1)を使用します。
                 const nx_norm = nx_ds / ds_geom;
                 const ny_norm = ny_ds / ds_geom;
 
-                // x, y方向の速度勾配テンソルへの分解
-                const du_dx = nx_norm * du_dn;
-                const du_dy = ny_norm * du_dn;
-                const dv_dx = nx_norm * dv_dn;
-                const dv_dy = ny_norm * dv_dn;
+                // --- 圧力抵抗 ---
+                const p_face = 0.5 * (pFlow[idx0_j] + pFlow[idx0_j1]);
+                Fx_p += -p_face * nx_ds;
+                Fy_p += -p_face * ny_ds;
 
-                // ニュートン流体の粘性応力テンソル計算
-                const tau_xx = (2.0 / Re) * du_dx;
-                const tau_xy = (1.0 / Re) * (du_dy + dv_dx);
-                const tau_yy = (2.0 / Re) * dv_dy;
+                // --- 法線方向距離（面中心で平均） ---
+                const h1 = 0.5 * (
+                    (gridX[idx1_j] - gridX[idx0_j]) * nx_norm + (gridY[idx1_j] - gridY[idx0_j]) * ny_norm +
+                    (gridX[idx1_j1] - gridX[idx0_j1]) * nx_norm + (gridY[idx1_j1] - gridY[idx0_j1]) * ny_norm
+                );
+                const h2 = 0.5 * (
+                    (gridX[idx2_j] - gridX[idx0_j]) * nx_norm + (gridY[idx2_j] - gridY[idx0_j]) * ny_norm +
+                    (gridX[idx2_j1] - gridX[idx0_j1]) * nx_norm + (gridY[idx2_j1] - gridY[idx0_j1]) * ny_norm
+                );
+                if (Math.abs(h1) < 1e-12 || Math.abs(h2 - h1) < 1e-12) continue;
 
-                // 粘性力の積分（応力テンソルと面積分ベクトルの内積）
-                Fx_v += tau_xx * nx_ds + tau_xy * ny_ds;
-                Fy_v += tau_xy * nx_ds + tau_yy * ny_ds;
+                // --- 面中心速度 ---
+                const u1 = 0.5 * (uFlow[idx1_j] + uFlow[idx1_j1]);
+                const v1 = 0.5 * (vFlow[idx1_j] + vFlow[idx1_j1]);
+                const u2 = 0.5 * (uFlow[idx2_j] + uFlow[idx2_j1]);
+                const v2 = 0.5 * (vFlow[idx2_j] + vFlow[idx2_j1]);
+
+                // --- 2次精度片側差分（非等間隔格子） ---
+                const denom = h1 * h2 * (h2 - h1);
+                const du_dn = (h2 * h2 * u1 - h1 * h1 * u2) / denom;
+                const dv_dn = (h2 * h2 * v1 - h1 * h1 * v2) / denom;
+
+                // --- 粘性抵抗 ---
+                // no-slip 壁面上で ∂u/∂s = ∂v/∂s = 0 が厳密に成立するため
+                // 応力テンソルの壁面力は法線勾配のみで表現される：
+                //   fx = (1/Re) * [ (1+nx²)*du_dn + nx*ny*dv_dn ]
+                //   fy = (1/Re) * [ nx*ny*du_dn + (1+ny²)*dv_dn ]
+                const inv_Re = 1.0 / Re;
+                const nx2 = nx_norm * nx_norm;
+                const ny2 = ny_norm * ny_norm;
+                const nxny = nx_norm * ny_norm;
+                Fx_v += inv_Re * (du_dn * (1.0 + nx2) + dv_dn * nxny) * ds_geom;
+                Fy_v += inv_Re * (dv_dn * (1.0 + ny2) + du_dn * nxny) * ds_geom;
             }
 
+            // --- 揚力・抗力への変換 ---
             const Fx = Fx_p + Fx_v;
             const Fy = Fy_p + Fy_v;
-
             const cosA = Math.cos(Alpha_AoA);
             const sinA = Math.sin(Alpha_AoA);
-
             const F_drag = Fx * cosA + Fy * sinA;
             const F_lift = -Fx * sinA + Fy * cosA;
-
             return {
                 CL: 2.0 * F_lift,
                 CD: 2.0 * F_drag
