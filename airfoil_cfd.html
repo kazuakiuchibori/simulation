@@ -856,14 +856,14 @@
 
             let r = 0, g = 0, b = 0;
             if (mode === 'colormap_velocity') {
-                if (norm < 0.125) { r = 15; g = 15; b = 90; }
-                else if (norm < 0.250) { r = 0; g = 0; b = 230; }
-                else if (norm < 0.375) { r = 0; g = 160; b = 255; }
-                else if (norm < 0.500) { r = 0; g = 220; b = 80; }
-                else if (norm < 0.625) { r = 230; g = 230; b = 0; }
-                else if (norm < 0.750) { r = 255; g = 100; b = 0; }
-                else if (norm < 0.875) { r = 255; g = 0; b = 0; }
-                else { r = 255; g = 210; b = 210; }
+                if (norm < 0.125) { r = 0; g = 0; b = 180; }   // 濃青
+                else if (norm < 0.250) { r = 80; g = 80; b = 255; }   // 青
+                else if (norm < 0.375) { r = 180; g = 180; b = 255; }   // 薄青
+                else if (norm < 0.500) { r = 240; g = 240; b = 255; }   // 白に近い青
+                else if (norm < 0.625) { r = 255; g = 240; b = 240; }   // 白に近い赤
+                else if (norm < 0.750) { r = 255; g = 180; b = 180; }   // 薄赤
+                else if (norm < 0.875) { r = 255; g = 80; b = 80; }   // 赤
+                else { r = 180; g = 0; b = 0; }                     // 濃赤
             }
             else if (mode === 'colormap_pressure') {
                 if (norm < 0.0909) { r = 200; g = 0; b = 200; } // 1. マゼンタ [-2.00 ～ -1.75]
