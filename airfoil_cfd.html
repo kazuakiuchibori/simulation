@@ -261,7 +261,7 @@
         let maxCflGlobal = 0.0;
         let maxDiffGlobal = 0.0;
 
-        const rotCenterX = -0.4;
+        const rotCenterX = 0.0;  // 1/4弦長点（前縁-0.25 + 0.25 = 0）
         const rotCenterY = 0.0;
 
         function updateCfdParamsFromUi() {
@@ -424,7 +424,7 @@
                     x_surf = x_norm + geo.yt * Math.sin(geo.theta_c);
                     y_surf = geo.yc - geo.yt * Math.cos(geo.theta_c);
                 }
-                x_surf = (x_surf - 0.4) * 1.0;
+                x_surf = (x_surf - 0.25) * 1.0;
                 y_surf = y_surf * 1.0;
 
                 if (j === 0 || j === jmax - 1) { y_surf = 0.0; }
@@ -1105,6 +1105,102 @@
                 ctx.fillStyle = "#ffaa88";
                 ctx.fillText(`CD: ${coeffs.CD.toFixed(4)}`, 135, 123);
             }
+
+            // ─── 枠メモリ（目盛り）描画 ───────────────────────────────────────
+            {
+                const W = canvas.width;
+                const H = canvas.height;
+                const tickLen = 6;
+                const minorTickLen = 3;
+                const tickColor = 'rgba(80, 80, 80, 0.85)';
+                const labelColor = '#333333';
+
+                const xMin = -offsetX / scale;
+                const xMax = (W - offsetX) / scale;
+                const yMax =  offsetY / scale;
+                const yMin = (offsetY - H) / scale;
+
+                function niceStep(range, maxTicks) {
+                    const raw = range / maxTicks;
+                    const mag = Math.pow(10, Math.floor(Math.log10(raw)));
+                    const norm = raw / mag;
+                    let step;
+                    if      (norm < 1.5) step = 1.0;
+                    else if (norm < 3.5) step = 2.0;
+                    else if (norm < 7.5) step = 5.0;
+                    else                 step = 10.0;
+                    return step * mag;
+                }
+
+                const majorStep = niceStep(xMax - xMin, 8);
+                const minorDiv  = 5;
+                const minorStep = majorStep / minorDiv;
+
+                function fmtTick(v, step) {
+                    if (Math.abs(v) < step * 1e-9) return '0';
+                    const decimals = Math.max(0, -Math.floor(Math.log10(step)) + 1);
+                    return v.toFixed(Math.min(decimals, 6)).replace(/\.?0+$/, '');
+                }
+
+                ctx.save();
+                ctx.font = '10px "Helvetica Neue", Arial, sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'top';
+
+                // ── 上辺・下辺（X軸） ──
+                const xStart = Math.ceil(xMin / minorStep) * minorStep;
+                for (let x = xStart; x <= xMax + minorStep * 0.5; x += minorStep) {
+                    const px = Math.round(offsetX + x * scale);
+                    if (px < 0 || px > W) continue;
+                    const isMajor = Math.abs(Math.round(x / majorStep) * majorStep - x) < majorStep * 1e-6;
+                    const tLen = isMajor ? tickLen : minorTickLen;
+
+                    ctx.strokeStyle = tickColor;
+                    ctx.lineWidth = isMajor ? 1.2 : 0.7;
+                    ctx.beginPath(); ctx.moveTo(px, 0); ctx.lineTo(px, tLen); ctx.stroke();
+                    ctx.beginPath(); ctx.moveTo(px, H); ctx.lineTo(px, H - tLen); ctx.stroke();
+
+                    if (isMajor) {
+                        const label = fmtTick(x, majorStep);
+                        ctx.fillStyle = labelColor;
+                        ctx.textBaseline = 'top';
+                        ctx.fillText(label, px, tickLen + 2);
+                        ctx.textBaseline = 'bottom';
+                        ctx.fillText(label, px, H - tickLen - 2);
+                        ctx.textBaseline = 'top';
+                    }
+                }
+
+                // ── 左辺・右辺（Y軸） ──
+                const yStep = niceStep(yMax - yMin, 5);
+                const yMinorStep = yStep / minorDiv;
+                const yStart = Math.ceil(yMin / yMinorStep) * yMinorStep;
+                ctx.textBaseline = 'middle';
+
+                for (let y = yStart; y <= yMax + yMinorStep * 0.5; y += yMinorStep) {
+                    const py = Math.round(offsetY - y * scale);
+                    if (py < 0 || py > H) continue;
+                    const isMajor = Math.abs(Math.round(y / yStep) * yStep - y) < yStep * 1e-6;
+                    const tLen = isMajor ? tickLen : minorTickLen;
+
+                    ctx.strokeStyle = tickColor;
+                    ctx.lineWidth = isMajor ? 1.2 : 0.7;
+                    ctx.beginPath(); ctx.moveTo(0, py); ctx.lineTo(tLen, py); ctx.stroke();
+                    ctx.beginPath(); ctx.moveTo(W, py); ctx.lineTo(W - tLen, py); ctx.stroke();
+
+                    if (isMajor) {
+                        const label = fmtTick(y, yStep);
+                        ctx.fillStyle = labelColor;
+                        ctx.textAlign = 'left';
+                        ctx.fillText(label, tLen + 3, py);
+                        ctx.textAlign = 'right';
+                        ctx.fillText(label, W - tLen - 3, py);
+                        ctx.textAlign = 'left';
+                    }
+                }
+                ctx.restore();
+            }
+            // ─────────────────────────────────────────────────────────────────
         }
 
         function updateAndRender() {
