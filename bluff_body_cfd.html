@@ -477,24 +477,13 @@
                     const idx = getIdx(i, j);
                     const ip = getIdx(Math.min(imax - 1, i + 1), j);
                     const im = getIdx(Math.max(0, i - 1), j);
-                    const ipp = getIdx(Math.min(imax - 1, i + 2), j);
-                    const imm = getIdx(Math.max(0, i - 2), j);
                     const jp = getIdx(i, j + 1);
                     const jm = getIdx(i, j - 1);
-                    const jpp = getIdx(i, j + 2);
-                    const jmm = getIdx(i, j - 2);
 
-                    let x_xi, y_xi;
-                    if (i >= 2 && i <= imax - 3) {
-                        x_xi = (- gridX[ipp] + 8.0 * gridX[ip] - 8.0 * gridX[im] + gridX[imm]) / 12.0;
-                        y_xi = (- gridY[ipp] + 8.0 * gridY[ip] - 8.0 * gridY[im] + gridY[imm]) / 12.0;
-                    } else {
-                        x_xi = 0.5 * (gridX[ip] - gridX[im]);
-                        y_xi = 0.5 * (gridY[ip] - gridY[im]);
-                    }
-
-                    const x_eta = (- gridX[jpp] + 8.0 * gridX[jp] - 8.0 * gridX[jm] + gridX[jmm]) / 12.0;
-                    const y_eta = (- gridY[jpp] + 8.0 * gridY[jp] - 8.0 * gridY[jm] + gridY[jmm]) / 12.0;
+                    const x_xi = 0.5 * (gridX[ip] - gridX[im]);
+                    const y_xi = 0.5 * (gridY[ip] - gridY[im]);
+                    const x_eta = 0.5 * (gridX[jp] - gridX[jm]);
+                    const y_eta = 0.5 * (gridY[jp] - gridY[jm]);
 
                     const Jac = x_xi * y_eta - x_eta * y_xi;
                     metrics.J[idx] = Jac;
@@ -712,18 +701,10 @@
                     const idx = getIdx(i, j);
                     const ip = getIdx(i + 1, j), im = getIdx(i - 1, j);
                     const jp = getIdx(i, j + 1), jm = getIdx(i, j - 1);
-                    const ipp = getIdx(i + 2, j), imm = getIdx(i - 2, j);
-                    const jpp = getIdx(i, j + 2), jmm = getIdx(i, j - 2);
                     const J = metrics.J[idx];
 
-                    let dJU_dxi;
-                    if (i >= 2 && i <= imax - 3) {
-                        dJU_dxi = (- JU[ipp] + 8.0 * JU[ip] - 8.0 * JU[im] + JU[imm]) / 12.0;
-                    } else {
-                        dJU_dxi = (JU[ip] - JU[im]) / 2.0;
-                    }
-
-                    const dJV_deta = (- JV[jpp] + 8.0 * JV[jp] - 8.0 * JV[jm] + JV[jmm]) / 12.0;
+                    const dJU_dxi = (JU[ip] - JU[im]) * 0.5;
+                    const dJV_deta = (JV[jp] - JV[jm]) * 0.5;
 
                     src[idx] = (dJU_dxi + dJV_deta) / J / dt;
                 }
