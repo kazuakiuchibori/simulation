@@ -683,39 +683,65 @@
 
                     let u_xi, v_xi, u_eta, v_eta;
 
-                    if (i === 1) {
+                    if (i === 1 || i === imax - 2) {
                         if (U > 0.0) {
-                            u_xi = (uFlow[ip] - uFlow[im]) * 0.5;
-                            v_xi = (vFlow[ip] - vFlow[im]) * 0.5;
+                            u_xi = uFlow[idx] - uFlow[im];
+                            v_xi = vFlow[idx] - vFlow[im];
                         } else {
-                            u_xi = (-uFlow[ipp] + 4.0 * uFlow[ip] - 3.0 * uFlow[idx]) * 0.5;
-                            v_xi = (-vFlow[ipp] + 4.0 * vFlow[ip] - 3.0 * vFlow[idx]) * 0.5;
+                            u_xi = uFlow[ip] - uFlow[idx];
+                            v_xi = vFlow[ip] - vFlow[idx];
                         }
-                    } else if (i === imax - 2) {
+                    } else {
                         if (U > 0.0) {
                             u_xi = (3.0 * uFlow[idx] - 4.0 * uFlow[im] + uFlow[imm]) * 0.5;
                             v_xi = (3.0 * vFlow[idx] - 4.0 * vFlow[im] + vFlow[imm]) * 0.5;
                         } else {
-                            u_xi = (uFlow[ip] - uFlow[im]) * 0.5;
-                            v_xi = (vFlow[ip] - vFlow[im]) * 0.5;
-                        }
-                    } else {
-                        if (U > 0.0) {
-                            u_xi = (uFlow[ipp] + 4.0 * uFlow[ip] + 18.0 * uFlow[idx] - 28.0 * uFlow[im] + 5.0 * uFlow[imm]) / 24.0;
-                            v_xi = (vFlow[ipp] + 4.0 * vFlow[ip] + 18.0 * vFlow[idx] - 28.0 * vFlow[im] + 5.0 * vFlow[imm]) / 24.0;
-                        } else {
-                            u_xi = (-5.0 * uFlow[ipp] + 28.0 * uFlow[ip] - 18.0 * uFlow[idx] - 4.0 * uFlow[im] - uFlow[imm]) / 24.0;
-                            v_xi = (-5.0 * vFlow[ipp] + 28.0 * vFlow[ip] - 18.0 * vFlow[idx] - 4.0 * vFlow[im] - vFlow[imm]) / 24.0;
+                            u_xi = (-uFlow[ipp] + 4.0 * uFlow[ip] - 3.0 * uFlow[idx]) * 0.5;
+                            v_xi = (-vFlow[ipp] + 4.0 * vFlow[ip] - 3.0 * vFlow[idx]) * 0.5;
                         }
                     }
 
                     if (V > 0.0) {
-                        u_eta = (uFlow[jpp] + 4.0 * uFlow[jp] + 18.0 * uFlow[idx] - 28.0 * uFlow[jm] + 5.0 * uFlow[jmm]) / 24.0;
-                        v_eta = (vFlow[jpp] + 4.0 * vFlow[jp] + 18.0 * vFlow[idx] - 28.0 * vFlow[jm] + 5.0 * vFlow[jmm]) / 24.0;
+                        u_eta = (3.0 * uFlow[idx] - 4.0 * uFlow[jm] + uFlow[jmm]) * 0.5;
+                        v_eta = (3.0 * vFlow[idx] - 4.0 * vFlow[jm] + vFlow[jmm]) * 0.5;
                     } else {
-                        u_eta = (-5.0 * uFlow[jpp] + 28.0 * uFlow[jp] - 18.0 * uFlow[idx] - 4.0 * uFlow[jm] - uFlow[jmm]) / 24.0;
-                        v_eta = (-5.0 * vFlow[jpp] + 28.0 * vFlow[jp] - 18.0 * vFlow[idx] - 4.0 * vFlow[jm] - vFlow[jmm]) / 24.0;
+                        u_eta = (-uFlow[jpp] + 4.0 * uFlow[jp] - 3.0 * uFlow[idx]) * 0.5;
+                        v_eta = (-vFlow[jpp] + 4.0 * vFlow[jp] - 3.0 * vFlow[idx]) * 0.5;
                     }
+
+                    //if (i === 1) {
+                    //    if (U > 0.0) {
+                    //        u_xi = (uFlow[ip] - uFlow[im]) * 0.5;
+                    //        v_xi = (vFlow[ip] - vFlow[im]) * 0.5;
+                    //    } else {
+                    //        u_xi = (-uFlow[ipp] + 4.0 * uFlow[ip] - 3.0 * uFlow[idx]) * 0.5;
+                    //        v_xi = (-vFlow[ipp] + 4.0 * vFlow[ip] - 3.0 * vFlow[idx]) * 0.5;
+                    //    }
+                    //} else if (i === imax - 2) {
+                    //    if (U > 0.0) {
+                    //        u_xi = (3.0 * uFlow[idx] - 4.0 * uFlow[im] + uFlow[imm]) * 0.5;
+                    //        v_xi = (3.0 * vFlow[idx] - 4.0 * vFlow[im] + vFlow[imm]) * 0.5;
+                    //    } else {
+                    //        u_xi = (uFlow[ip] - uFlow[im]) * 0.5;
+                    //        v_xi = (vFlow[ip] - vFlow[im]) * 0.5;
+                    //    }
+                    //} else {
+                    //    if (U > 0.0) {
+                    //        u_xi = (uFlow[ipp] + 4.0 * uFlow[ip] + 18.0 * uFlow[idx] - 28.0 * uFlow[im] + 5.0 * uFlow[imm]) / 24.0;
+                    //        v_xi = (vFlow[ipp] + 4.0 * vFlow[ip] + 18.0 * vFlow[idx] - 28.0 * vFlow[im] + 5.0 * vFlow[imm]) / 24.0;
+                    //    } else {
+                    //        u_xi = (-5.0 * uFlow[ipp] + 28.0 * uFlow[ip] - 18.0 * uFlow[idx] - 4.0 * uFlow[im] - uFlow[imm]) / 24.0;
+                    //        v_xi = (-5.0 * vFlow[ipp] + 28.0 * vFlow[ip] - 18.0 * vFlow[idx] - 4.0 * vFlow[im] - vFlow[imm]) / 24.0;
+                    //    }
+                    //}
+
+                    //if (V > 0.0) {
+                    //    u_eta = (uFlow[jpp] + 4.0 * uFlow[jp] + 18.0 * uFlow[idx] - 28.0 * uFlow[jm] + 5.0 * uFlow[jmm]) / 24.0;
+                    //    v_eta = (vFlow[jpp] + 4.0 * vFlow[jp] + 18.0 * vFlow[idx] - 28.0 * vFlow[jm] + 5.0 * vFlow[jmm]) / 24.0;
+                    //} else {
+                    //    u_eta = (-5.0 * uFlow[jpp] + 28.0 * uFlow[jp] - 18.0 * uFlow[idx] - 4.0 * uFlow[jm] - uFlow[jmm]) / 24.0;
+                    //    v_eta = (-5.0 * vFlow[jpp] + 28.0 * vFlow[jp] - 18.0 * vFlow[idx] - 4.0 * vFlow[jm] - vFlow[jmm]) / 24.0;
+                    //}
 
                     const ab_u = U * u_xi + V * u_eta;
                     const ab_v = U * v_xi + V * v_eta;
@@ -798,7 +824,7 @@
                 }
             }
 
-            const omega_p = 1.8;
+            const omega_p = 1.5;
 
             for (let iter = 0; iter < 30; iter++) {
                 for (let i = 1; i < imax - 1; i++) {
