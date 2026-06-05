@@ -181,9 +181,9 @@
                     <label for="viewModeSelect">Visualization:</label>
                     <select id="viewModeSelect">
                         <option value="meshOnly">Computational grid</option>
-                        <option value="velocity" selected>Velocity magnitude</option>
-                        <option value="pressure">Pressure</option>
-                        <option value="vorticity">Vorticity</option>
+                        <option value="velocity" selected>Velocity magnitude |u| = √(u²+v²)</option>
+                        <option value="pressure">Pressure p = (p−p∞) / (½ρu∞²)</option>
+                        <option value="vorticity">Vorticity ω = ∂v/∂x − ∂u/∂y</option>
                     </select>
                 </div>
             </div>
@@ -219,7 +219,7 @@
         const radiusInput = { value: '0.5' }; // 半径は0.5に固定
 
         let scale = 200.0;
-        let offsetX = canvas.width / 2;
+        let offsetX = canvas.width / 2 - 1.0 * scale;
         let offsetY = canvas.height / 2;
         let isDragging = false;
         let startX = 0;
@@ -1037,6 +1037,98 @@
                 ctx.fillStyle = "#ffaa88";
                 ctx.fillText(`CD: ${coeffs.CD.toFixed(4)}`, 135, 123);
             }
+
+            // ─── カラーバー描画（色境界＝目盛り） ────────────────────────────
+            if (viewMode !== 'meshOnly') {
+                // モードごとの色帯定義（境界値と色）
+                const bands = viewMode === 'velocity' ? [
+                    { from: 0.000, to: 0.125, r:   0, g:   0, b: 180 },
+                    { from: 0.125, to: 0.250, r:  80, g:  80, b: 255 },
+                    { from: 0.250, to: 0.375, r: 180, g: 180, b: 255 },
+                    { from: 0.375, to: 0.500, r: 240, g: 240, b: 255 },
+                    { from: 0.500, to: 0.625, r: 255, g: 240, b: 240 },
+                    { from: 0.625, to: 0.750, r: 255, g: 180, b: 180 },
+                    { from: 0.750, to: 0.875, r: 255, g:  80, b:  80 },
+                    { from: 0.875, to: 1.000, r: 180, g:   0, b:   0 },
+                ].map(b => ({ ...b, fromV: b.from * U_inf * 2, toV: b.to * U_inf * 2 }))
+                : viewMode === 'pressure' ? [
+                    { from: 0.0000, to: 0.0909, r: 200, g:   0, b: 200, fromV: -2.00, toV: -1.75 },
+                    { from: 0.0909, to: 0.1818, r: 110, g:   0, b: 220, fromV: -1.75, toV: -1.50 },
+                    { from: 0.1818, to: 0.2727, r:   0, g:  60, b: 240, fromV: -1.50, toV: -1.25 },
+                    { from: 0.2727, to: 0.3636, r:   0, g: 140, b: 255, fromV: -1.25, toV: -1.00 },
+                    { from: 0.3636, to: 0.4545, r:   0, g: 210, b: 255, fromV: -1.00, toV: -0.75 },
+                    { from: 0.4545, to: 0.5455, r:   0, g: 200, b: 150, fromV: -0.75, toV: -0.50 },
+                    { from: 0.5455, to: 0.6364, r:   0, g: 160, b:  70, fromV: -0.50, toV: -0.25 },
+                    { from: 0.6364, to: 0.7273, r: 130, g: 200, b:  60, fromV: -0.25, toV:  0.00 },
+                    { from: 0.7273, to: 0.8182, r: 200, g: 200, b:  30, fromV:  0.00, toV:  0.25 },
+                    { from: 0.8182, to: 0.9091, r: 240, g: 120, b:  20, fromV:  0.25, toV:  0.50 },
+                    { from: 0.9091, to: 1.0000, r: 240, g:  10, b:  10, fromV:  0.50, toV:  0.75 },
+                ]
+                : /* vorticity */ [
+                    { from: 0.000, to: 0.100, r: 100, g:   0, b: 200 },
+                    { from: 0.100, to: 0.250, r:   0, g: 100, b: 255 },
+                    { from: 0.250, to: 0.450, r:   0, g: 220, b: 255 },
+                    { from: 0.450, to: 0.550, r: 127, g: 127, b: 127 },
+                    { from: 0.550, to: 0.750, r: 240, g: 230, b:   0 },
+                    { from: 0.750, to: 0.900, r: 255, g: 110, b:   0 },
+                    { from: 0.900, to: 1.000, r: 255, g:   0, b:   0 },
+                ].map(b => ({ ...b, fromV: -10 + b.from * 20, toV: -10 + b.to * 20 }));
+
+                const label = viewMode === 'velocity' ? '|u|' : viewMode === 'pressure' ? 'p' : 'ω';
+                const cbH = Math.floor((canvas.height - 48) / 2);
+                const cbW = 16;
+                const cbX = 38;   // 左辺目盛りラベル幅を避ける
+                const cbY = canvas.height - cbH - 28;  // 下辺目盛りラベル高さを避ける
+
+                ctx.save();
+
+                // 色帯を境界ピッタリで描画
+                bands.forEach(b => {
+                    const y0 = cbY + (1 - b.to)   * cbH;
+                    const y1 = cbY + (1 - b.from) * cbH;
+                    ctx.fillStyle = `rgb(${b.r},${b.g},${b.b})`;
+                    ctx.fillRect(cbX, y0, cbW, y1 - y0 + 0.5);
+                });
+
+                // 枠
+                ctx.strokeStyle = 'rgba(60,60,60,0.5)';
+                ctx.lineWidth = 0.8;
+                ctx.strokeRect(cbX, cbY, cbW, cbH);
+
+                // ラベル（label名）
+                ctx.font = 'bold 11px "Helvetica Neue", Arial, sans-serif';
+                ctx.fillStyle = '#333';
+                ctx.textAlign = 'center';
+                ctx.fillText(label, cbX + cbW / 2, cbY - 7);
+
+                // 境界線＋境界値ラベル（右側に出す）
+                ctx.font = '10px "Helvetica Neue", Arial, sans-serif';
+                ctx.textAlign = 'left';
+                const drawn = new Set();
+                bands.forEach(b => {
+                    [b.from, b.to].forEach((norm, ki) => {
+                        const val = ki === 0 ? b.fromV : b.toV;
+                        const key = norm.toFixed(6);
+                        if (drawn.has(key)) return;
+                        drawn.add(key);
+                        const py = cbY + (1 - norm) * cbH;
+                        // 境界線
+                        ctx.strokeStyle = 'rgba(0,0,0,0.25)';
+                        ctx.lineWidth = 0.8;
+                        ctx.beginPath(); ctx.moveTo(cbX, py); ctx.lineTo(cbX + cbW, py); ctx.stroke();
+                        // 右にティック＋ラベル
+                        ctx.strokeStyle = 'rgba(60,60,60,0.6)';
+                        ctx.lineWidth = 0.8;
+                        ctx.beginPath(); ctx.moveTo(cbX + cbW, py); ctx.lineTo(cbX + cbW + 4, py); ctx.stroke();
+                        const lbl = parseFloat(val.toPrecision(3)).toString();
+                        ctx.fillStyle = '#222';
+                        ctx.fillText(lbl, cbX + cbW + 6, py + 3.5);
+                    });
+                });
+
+                ctx.restore();
+            }
+            // ─────────────────────────────────────────────────────────────────
 
             // ─── 枠メモリ（目盛り）描画 ───────────────────────────────────────
             {
