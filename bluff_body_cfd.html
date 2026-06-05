@@ -917,36 +917,29 @@
                             color = getDiscreteColor(p, -2.0, 0.75, 'colormap_pressure');
 
                         } else if (viewMode === 'vorticity' && uFlow && vFlow) {
-                            function clamp(v, vmin, vmax) { return Math.max(vmin, Math.min(vmax, v)); }
-                            function getVorticity(ii, jj) {
-                                const ic = clamp(ii, 1, imax - 2);
-                                const jc = clamp(jj, 1, jmax - 2);
+                            const idx00 = getIdx(i,     j    );
+                            const idx10 = getIdx(i + 1, j    );
+                            const idx11 = getIdx(i + 1, j + 1);
+                            const idx01 = getIdx(i,     j + 1);
 
-                                const idx_ip = getIdx(ic + 1, jc);
-                                const idx_im = getIdx(ic - 1, jc);
-                                const idx_jp = getIdx(ic, jc + 1);
-                                const idx_jm = getIdx(ic, jc - 1);
+                            const x_xi  = 0.25 * ((gridX[idx10] - gridX[idx00]) + (gridX[idx11] - gridX[idx01]));
+                            const y_xi  = 0.25 * ((gridY[idx10] - gridY[idx00]) + (gridY[idx11] - gridY[idx01]));
+                            const x_eta = 0.25 * ((gridX[idx01] - gridX[idx00]) + (gridX[idx11] - gridX[idx10]));
+                            const y_eta = 0.25 * ((gridY[idx01] - gridY[idx00]) + (gridY[idx11] - gridY[idx10]));
 
-                                const x_xi = 0.5 * (gridX[idx_ip] - gridX[idx_im]);
-                                const y_xi = 0.5 * (gridY[idx_ip] - gridY[idx_im]);
-                                const x_eta = 0.5 * (gridX[idx_jp] - gridX[idx_jm]);
-                                const y_eta = 0.5 * (gridY[idx_jp] - gridY[idx_jm]);
+                            const J = x_xi * y_eta - x_eta * y_xi;
 
-                                const J = x_xi * y_eta - x_eta * y_xi;
-                                if (Math.abs(J) < 1.0e-12) return 0.0;
+                            let vort = 0.0;
+                            if (Math.abs(J) >= 1.0e-12) {
+                                const u_xi  = 0.25 * ((uFlow[idx10] - uFlow[idx00]) + (uFlow[idx11] - uFlow[idx01]));
+                                const u_eta = 0.25 * ((uFlow[idx01] - uFlow[idx00]) + (uFlow[idx11] - uFlow[idx10]));
+                                const v_xi  = 0.25 * ((vFlow[idx10] - vFlow[idx00]) + (vFlow[idx11] - vFlow[idx01]));
+                                const v_eta = 0.25 * ((vFlow[idx01] - vFlow[idx00]) + (vFlow[idx11] - vFlow[idx10]));
 
-                                const u_xi = 0.5 * (uFlow[idx_ip] - uFlow[idx_im]);
-                                const u_eta = 0.5 * (uFlow[idx_jp] - uFlow[idx_jm]);
-                                const v_xi = 0.5 * (vFlow[idx_ip] - vFlow[idx_im]);
-                                const v_eta = 0.5 * (vFlow[idx_jp] - vFlow[idx_jm]);
-
-                                const dv_dx = (y_eta * v_xi - y_xi * v_eta) / J;
-                                const du_dy = (-x_eta * u_xi + x_xi * u_eta) / J;
-
-                                return dv_dx - du_dy;
+                                const dv_dx = (y_eta * v_xi  - y_xi  * v_eta) / J;
+                                const du_dy = (x_xi  * u_eta - x_eta * u_xi ) / J;
+                                vort = dv_dx - du_dy;
                             }
-
-                            const vort = 0.25 * (getVorticity(i, j) + getVorticity(i + 1, j) + getVorticity(i + 1, j + 1) + getVorticity(i, j + 1));
                             color = getDiscreteColor(vort, -10.0, 10.0, 'colormap_vorticity');
                         }
 
