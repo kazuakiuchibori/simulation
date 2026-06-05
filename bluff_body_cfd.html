@@ -621,11 +621,11 @@
                         }
                     } else if (i === imax - 2) {
                         if (U > 0.0) {
-                            u_xi = (3.0 * uFlow[idx] - 4.0 * uFlow[im] + uFlow[imm]) * 0.5;
-                            v_xi = (3.0 * vFlow[idx] - 4.0 * vFlow[im] + vFlow[imm]) * 0.5;
+                            u_xi = uFlow[idx] - uFlow[im];
+                            v_xi = vFlow[idx] - vFlow[im];
                         } else {
-                            u_xi = (uFlow[ip] - uFlow[im]) * 0.5;
-                            v_xi = (vFlow[ip] - vFlow[im]) * 0.5;
+                            u_xi = uFlow[ip] - uFlow[idx];
+                            v_xi = vFlow[ip] - vFlow[idx];
                         }
                     } else {
                         if (U > 0.0) {
