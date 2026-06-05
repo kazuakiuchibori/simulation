@@ -1009,7 +1009,7 @@
                                 const du_dy = (x_xi  * u_eta - x_eta * u_xi ) / J;
                                 vort = dv_dx - du_dy;
                             }
-                            color = getDiscreteColor(vort, -10.0, 10.0, 'colormap_vorticity');
+                            color = getDiscreteColor(vort, -50.0, 50.0, 'colormap_vorticity');
                         }
 
                         ctx.fillStyle = color;
@@ -1132,7 +1132,7 @@
                     { from: 0.550, to: 0.750, r: 240, g: 230, b:   0 },
                     { from: 0.750, to: 0.900, r: 255, g: 110, b:   0 },
                     { from: 0.900, to: 1.000, r: 255, g:   0, b:   0 },
-                ].map(b => ({ ...b, fromV: -50 + b.from * 100, toV: -50 + b.to * 100 }));
+                ].map(b => ({ ...b, fromV: -100 + b.from * 100, toV: -50 + b.to * 100 }));
 
                 const label = viewMode === 'velocity' ? '|u|' : viewMode === 'pressure' ? 'p' : 'ω';
                 const cbH = Math.floor((canvas.height - 48) / 2);
