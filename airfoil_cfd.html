@@ -273,8 +273,8 @@
 
             // Reの変更に合わせて自動決定
             const logRe = Math.log10(Re);
-            imax = Math.round(logRe * 18);
-            jmax = Math.round(logRe * 36);
+            imax = Math.round(logRe * 20);
+            jmax = Math.round(logRe * 40);
 
             const deg = parseFloat(aoaNum.value) || 0.0;
             Alpha_AoA = deg * Math.PI / 180.0;
@@ -672,7 +672,7 @@
 
                     let u_xi, v_xi, u_eta, v_eta;
 
-                    const alpha = 2.0;
+                    const alpha = 3.0;
 
                     if (i === 1) {
                         if (U > 0.0) {
