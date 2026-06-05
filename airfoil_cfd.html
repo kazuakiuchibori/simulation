@@ -1138,10 +1138,19 @@
                 const minorDiv  = 5;
                 const minorStep = majorStep / minorDiv;
 
+                // 目盛り数が多すぎる場合はスキップ（ズームアウト限界対策）
+                const maxTicks = 500;
+                if ((xMax - xMin) / minorStep > maxTicks || (yMax - yMin) / (niceStep(yMax - yMin, 5) / minorDiv) > maxTicks) {
+                    ctx.restore && ctx.restore();
+                    return;
+                }
+
                 function fmtTick(v, step) {
                     if (Math.abs(v) < step * 1e-9) return '0';
                     const decimals = Math.max(0, -Math.floor(Math.log10(step)) + 1);
-                    return v.toFixed(Math.min(decimals, 6)).replace(/\.?0+$/, '');
+                    const s = v.toFixed(Math.min(decimals, 6));
+                    // 小数点がある場合のみ末尾ゼロを除去（整数部のゼロは除去しない）
+                    return s.includes('.') ? s.replace(/\.?0+$/, '') : s;
                 }
 
                 ctx.save();
@@ -1151,10 +1160,11 @@
 
                 // ── 上辺・下辺（X軸） ──
                 const xStart = Math.ceil(xMin / minorStep) * minorStep;
-                for (let x = xStart; x <= xMax + minorStep * 0.5; x += minorStep) {
+                let xIdx = 0;
+                for (let x = xStart; x <= xMax + minorStep * 0.5; x += minorStep, xIdx++) {
                     const px = Math.round(offsetX + x * scale);
                     if (px < 0 || px > W) continue;
-                    const isMajor = Math.abs(Math.round(x / majorStep) * majorStep - x) < majorStep * 1e-6;
+                    const isMajor = (Math.round(xStart / minorStep) + xIdx) % minorDiv === 0;
                     const tLen = isMajor ? tickLen : minorTickLen;
 
                     ctx.strokeStyle = tickColor;
@@ -1178,11 +1188,11 @@
                 const yMinorStep = yStep / minorDiv;
                 const yStart = Math.ceil(yMin / yMinorStep) * yMinorStep;
                 ctx.textBaseline = 'middle';
-
-                for (let y = yStart; y <= yMax + yMinorStep * 0.5; y += yMinorStep) {
+                let yIdx = 0;
+                for (let y = yStart; y <= yMax + yMinorStep * 0.5; y += yMinorStep, yIdx++) {
                     const py = Math.round(offsetY - y * scale);
                     if (py < 0 || py > H) continue;
-                    const isMajor = Math.abs(Math.round(y / yStep) * yStep - y) < yStep * 1e-6;
+                    const isMajor = (Math.round(yStart / yMinorStep) + yIdx) % minorDiv === 0;
                     const tLen = isMajor ? tickLen : minorTickLen;
 
                     ctx.strokeStyle = tickColor;
