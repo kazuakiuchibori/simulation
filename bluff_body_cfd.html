@@ -270,8 +270,8 @@
 
             // Reの変更に合わせて自動決定
             const logRe = Math.log10(Re);
-            imax = Math.round(logRe * 18);
-            jmax = Math.round(logRe * 36);
+            imax = Math.round(logRe * 20);
+            jmax = Math.round(logRe * 40);
 
             const deg = parseFloat(aoaNum.value) || 0.0;
             Alpha_AoA = deg * Math.PI / 180.0;
@@ -638,7 +638,7 @@
                             v_xi = (-(1.0 + alpha) * vFlow[ipp] + (8.0 + 4.0 * alpha) * vFlow[ip] - 6.0 * alpha * vFlow[idx] - (8.0 - 4.0 * alpha) * vFlow[im] + (1.0 - alpha) * vFlow[imm]) / 12.0;
                         }
                     }
-                    
+
                     if (V > 0.0) {
                         u_eta = ((alpha - 1.0) * uFlow[jpp] + (8.0 - 4.0 * alpha) * uFlow[jp] + 6.0 * alpha * uFlow[idx] - (8.0 + 4.0 * alpha) * uFlow[jm] + (1.0 + alpha) * uFlow[jmm]) / 12.0;
                         v_eta = ((alpha - 1.0) * vFlow[jpp] + (8.0 - 4.0 * alpha) * vFlow[jp] + 6.0 * alpha * vFlow[idx] - (8.0 + 4.0 * alpha) * vFlow[jm] + (1.0 + alpha) * vFlow[jmm]) / 12.0;
@@ -667,7 +667,7 @@
             uFlowTmp.set(rhsU);
             vFlowTmp.set(rhsV);
 
-            const omega_u = 3.0;
+            const omega_u = 1.0;
 
             for (let iter = 0; iter < 10; iter++) {
                 for (let i = 1; i < imax - 1; i++) {
