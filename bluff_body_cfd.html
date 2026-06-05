@@ -1058,7 +1058,9 @@
 
                 // 目盛り間隔を画面幅に合わせて自動選択
                 function niceStep(range, maxTicks) {
+                    if (!isFinite(range) || range <= 0) return 1;
                     const raw = range / maxTicks;
+                    if (!isFinite(raw) || raw <= 0) return 1;
                     const mag = Math.pow(10, Math.floor(Math.log10(raw)));
                     const norm = raw / mag;
                     let step;
