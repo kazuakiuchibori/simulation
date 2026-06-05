@@ -189,7 +189,7 @@
             </div>
         </div>
 
-        <canvas id="gridCanvas" width="1200" height="640"></canvas>
+        <canvas id="gridCanvas" width="1200" height="600"></canvas>
 
         <div style="margin-top: 10px; margin-bottom: 10px; display: flex; justify-content: center; align-items: center; gap: 10px;">
             <span style="font-size: 13px; color: #555; font-weight: 500;">
@@ -270,8 +270,8 @@
 
             // Reの変更に合わせて自動決定
             const logRe = Math.log10(Re);
-            imax = Math.round(logRe * 22);
-            jmax = Math.round(logRe * 33);
+            imax = Math.round(logRe * 20);
+            jmax = Math.round(logRe * 40);
 
             const deg = parseFloat(aoaNum.value) || 0.0;
             Alpha_AoA = deg * Math.PI / 180.0;
@@ -1082,10 +1082,11 @@
 
                 // ── 上辺・下辺（X軸） ──
                 const xStart = Math.ceil(xMin / minorStep) * minorStep;
-                for (let x = xStart; x <= xMax + minorStep * 0.5; x += minorStep) {
+                let xIdx = 0;
+                for (let x = xStart; x <= xMax + minorStep * 0.5; x += minorStep, xIdx++) {
                     const px = Math.round(offsetX + x * scale);
                     if (px < 0 || px > W) continue;
-                    const isMajor = Math.abs(Math.round(x / majorStep) * majorStep - x) < majorStep * 1e-6;
+                    const isMajor = (Math.round(xStart / minorStep) + xIdx) % minorDiv === 0;
                     const tLen = isMajor ? tickLen : minorTickLen;
 
                     // 上辺
@@ -1096,7 +1097,8 @@
                     ctx.beginPath(); ctx.moveTo(px, H); ctx.lineTo(px, H - tLen); ctx.stroke();
 
                     if (isMajor) {
-                        const label = (Math.abs(x) < majorStep * 1e-9) ? '0' : x.toFixed(Math.max(0, -Math.floor(Math.log10(majorStep)) + 1)).replace(/\.?0+$/, '');
+                        const _xs = x.toFixed(Math.max(0, -Math.floor(Math.log10(majorStep)) + 1));
+                        const label = (Math.abs(x) < majorStep * 1e-9) ? '0' : (_xs.includes('.') ? _xs.replace(/\.?0+$/, '') : _xs);
                         // 上辺ラベル
                         const tw = ctx.measureText(label).width;
                         ctx.fillStyle = labelColor;
@@ -1115,11 +1117,11 @@
                 const yStart = Math.ceil(yMin / yMinorStep) * yMinorStep;
                 ctx.textAlign = 'left';
                 ctx.textBaseline = 'middle';
-
-                for (let y = yStart; y <= yMax + yMinorStep * 0.5; y += yMinorStep) {
+                let yIdx = 0;
+                for (let y = yStart; y <= yMax + yMinorStep * 0.5; y += yMinorStep, yIdx++) {
                     const py = Math.round(offsetY - y * scale);
                     if (py < 0 || py > H) continue;
-                    const isMajor = Math.abs(Math.round(y / yStep) * yStep - y) < yStep * 1e-6;
+                    const isMajor = (Math.round(yStart / yMinorStep) + yIdx) % minorDiv === 0;
                     const tLen = isMajor ? tickLen : minorTickLen;
 
                     ctx.strokeStyle = tickColor;
@@ -1130,7 +1132,8 @@
                     ctx.beginPath(); ctx.moveTo(W, py); ctx.lineTo(W - tLen, py); ctx.stroke();
 
                     if (isMajor) {
-                        const label = (Math.abs(y) < yStep * 1e-9) ? '0' : y.toFixed(Math.max(0, -Math.floor(Math.log10(yStep)) + 1)).replace(/\.?0+$/, '');
+                        const _ys = y.toFixed(Math.max(0, -Math.floor(Math.log10(yStep)) + 1));
+                        const label = (Math.abs(y) < yStep * 1e-9) ? '0' : (_ys.includes('.') ? _ys.replace(/\.?0+$/, '') : _ys);
                         const tw = ctx.measureText(label).width;
                         // 左辺ラベル
                         ctx.fillStyle = labelColor;
