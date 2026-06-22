@@ -1,0 +1,2064 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>Web CFD - Darrieus Turbine</title>
+    <style>
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            background: #fafafa;
+            color: #333;
+            text-align: center;
+            margin: 0;
+            padding: 10px 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            font-size: 22px;
+            color: #222;
+            margin-bottom: 5px;
+        }
+
+        p {
+            font-size: 13px;
+            color: #666;
+            margin-top: 0;
+            margin-bottom: 15px;
+        }
+
+        .control-panel {
+            background: white;
+            padding: 10px 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            margin-bottom: 15px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+
+        .control-group {
+            text-align: left;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .highlight-group {
+            border-left: 3px solid navy;
+            padding-left: 10px;
+        }
+
+        .cfd-group {
+            border-left: 3px solid grey;
+            padding-left: 10px;
+        }
+
+        .diag-group {
+            border-left: 3px solid brown;
+            padding-left: 10px;
+        }
+
+        label {
+            font-weight: bold;
+            font-size: 11px;
+            display: block;
+            margin-bottom: 3px;
+            color: #555;
+        }
+
+        .input-item {
+            margin-bottom: 6px;
+        }
+
+            .input-item:last-child {
+                margin-bottom: 0;
+            }
+
+        input[type="number"], select, button {
+            width: 100%;
+            box-sizing: border-box;
+            padding: 4px 6px;
+            font-size: 12px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            background: white;
+        }
+
+        button {
+            background: #9b59b6;
+            color: white;
+            border: none;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+            button:hover {
+                background: #8e44ad;
+            }
+
+            button:active {
+                background: #7d3c98;
+            }
+
+        .btn-cfd {
+            background: #e67e22;
+        }
+
+            .btn-cfd:hover {
+                background: #d35400;
+            }
+
+        .btn-container {
+            display: flex;
+            gap: 5px;
+        }
+
+        canvas {
+            background: #ffffff;
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
+            box-shadow: 0 6px 16px rgba(0,0,0,0.08);
+            max-width: 100%;
+            height: auto;
+            cursor: grab;
+        }
+
+            canvas:active {
+                cursor: grabbing;
+            }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Web CFD - Darrieus Turbine</h1>
+        <p>The unsteady flow around a circular-arc-cambered NACA 00XX airfoil is simulated by solving the incompressible 2D Navier–Stokes equations in a rotating frame on a fixed curvilinear grid using the FDM.</p>
+
+        <div class="control-panel">
+            <div class="control-group highlight-group">
+                <div class="input-item">
+                    <label for="nacaThicknessSelect">Circular-arc-cambered NACA 00XX (XX is blade thickness %):</label>
+                    <select id="nacaThicknessSelect" style="width:100%;box-sizing:border-box;padding:4px 6px;font-size:12px;border:1px solid #ccc;border-radius:4px;">
+                        <option value="06">NACA 0006</option>
+                        <option value="09">NACA 0009</option>
+                        <option value="12">NACA 0012</option>
+                        <option value="18" selected>NACA 0018</option>
+                        <option value="15">NACA 0015</option>
+                        <option value="21">NACA 0021</option>
+                        <option value="24">NACA 0024</option>
+                        <option value="27">NACA 0027</option>
+                        <option value="30">NACA 0030</option>
+                    </select>
+                </div>
+                <div class="input-item">
+                    <label for="nbladeInput">Number of blades:</label>
+                    <select id="nbladeInput" style="width:100%;box-sizing:border-box;padding:4px 6px;font-size:12px;border:1px solid #ccc;border-radius:4px;">
+                        <option value="1">1</option>
+                        <option value="2">2</option>
+                        <option value="3" selected>3</option>
+                        <option value="4">4</option>
+                        <option value="5">5</option>
+                    </select>
+                </div>
+                <div class="input-item">
+                    <label for="rRotorInput">Rotor radius R, normalized by blade chord c:</label>
+                    <select id="rRotorInput" style="width:100%;box-sizing:border-box;padding:4px 6px;font-size:12px;border:1px solid #ccc;border-radius:4px;">
+                        <option value="2.5" selected>2.5</option>
+                        <option value="5.0">5.0</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="control-group cfd-group">
+                <div class="input-item">
+                    <label for="reInput">Reynolds number Re = U∞c/ν (1000~1000000):</label>
+                    <input type="number" id="reInput" min="1000" max="1000000" step="1000" value="50000">
+                </div>
+                <div class="input-item">
+                    <label for="tsrInput">Tip speed ratio λ = ΩR/U∞ (2~8):</label>
+                    <input type="number" id="tsrInput" min="2" max="8" step="0.5" value="4">
+                </div>
+            </div>
+
+            <div class="control-group diag-group">
+                <div class="input-item">
+                    <label>Simulation:</label>
+                    <div class="btn-container">
+                        <button id="toggleCfdBtn" class="btn-cfd">Start</button>
+                        <button id="resetCfdBtn" style="background:#7f8c8d;">Refresh</button>
+                    </div>
+                </div>
+                <div class="input-item">
+                    <label for="viewModeSelect">Visualization:</label>
+                    <select id="viewModeSelect">
+                        <option value="meshOnly" selected>Computational grid</option>
+                        <option value="velocity">Velocity magnitude: |u|</option>
+                        <option value="pressure">Pressure: p</option>
+                        <option value="vorticity">Vorticity: ω</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <canvas id="gridCanvas" width="1200" height="600"></canvas>
+
+        <div style="margin-top: 10px; margin-bottom: 10px; display: flex; justify-content: center; align-items: center; gap: 10px;">
+            <span style="font-size: 13px; color: #555; font-weight: 500;">
+                If you wish to support my work,
+            </span>
+            <a href="https://www.buymeacoffee.com/kazuakiuchibori" target="_blank" style="display: inline-block; vertical-align: middle;">
+                <img src="https://cdn.buymeacoffee.com/buttons/v2/default-violet.png"
+                     alt="Buy Me A Coffee"
+                     style="height: 32px !important; width: 115px !important; border-radius: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); display: block;">
+            </a>
+        </div>
+        <p style="font-size: 12px; color: #888;">(c) 2026 Kazuaki Uchibori</p>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gridCanvas');
+        const ctx = canvas.getContext('2d');
+
+        const viewModeSelect = document.getElementById('viewModeSelect');
+        const toggleCfdBtn = document.getElementById('toggleCfdBtn');
+        const resetCfdBtn = document.getElementById('resetCfdBtn');
+
+        const reInput = document.getElementById('reInput');
+        const tsrInput = document.getElementById('tsrInput');
+
+        const nacaThicknessSelect = document.getElementById('nacaThicknessSelect');
+        const nbladeInput = document.getElementById('nbladeInput');
+        const rRotorInput = document.getElementById('rRotorInput');
+
+        // 厚みのみ取得
+        function getNacaThickness() {
+            return parseInt(nacaThicknessSelect.value) / 100.0;
+        }
+
+        let scale = 100.0;
+        let offsetX = canvas.width / 2 - 0.25 * scale;
+        let offsetY = canvas.height / 2;
+        let isDragging = false;
+        let startX = 0;
+        let startY = 0;
+
+        // 格子データ（Reから自動決定）
+        let imax = 60, jmax = 120;
+        let gridX = null, gridY = null;
+        let i_blade = 0; // 翼スリット行インデックス（generateInitialAlgebraicGridで確定）
+
+        // 流れ場
+        let uFlow = null;
+        let vFlow = null;
+        let pFlow = null;
+
+        // 幾何学メトリック
+        let metrics = null;
+
+        // 翼境界点情報（スムーシングQ項で参照）
+        // bladeInfo[k] = { jCenter, jLE, jTE, half }
+        let bladeInfo = [];
+
+        // 固体境界フラグ配列（imax*jmax, true=翼表面点=固定）
+        // i_blade行・i_blade+1行のうち実際に翼形状を書き込んだj点のみtrue
+        let isSolid = null;
+
+        // j列に翼が存在するかフラグ（jmax長）
+        // jHasBlade[j]=1 → そのj列にisSolid点がある → P項の引力対象
+        let jHasBlade = null;
+
+        // ─────────────────────────────────────────────────────────────────
+        // 手動登録テーブル: キー = "Nblade_rRotor" (例: "3_2.5")
+        // 未登録の組み合わせは自動計算値がそのまま使われる（フォールバック）
+        // 登録パラメータ:
+        //   i_blade           … 翼スリット行インデックス（整数）
+        //   blade_Points      … 翼型点数（奇数推奨）
+        //   aStrength         … P項強度（翼面への吸い付き）
+        //   qStrength         … Q項強度（前縁・後縁への引き込み）
+        //   pCenterMinWeight  … 翼中心でのP項最小割合 [0–1]
+        //   pWeightPower      … P項重みカーブ形状（大きいほど端部集中）
+        //   bDecayRadial      … P項の放射方向減衰
+        //   bDecayTangential  … P項の接線方向減衰
+        //   qDecayRadial      … Q項の放射方向減衰
+        //   qDecayTangential  … Q項の接線方向減衰
+        // ─────────────────────────────────────────────────────────────────
+        const GRID_PARAM_TABLE = {
+            // ── Nblade = 1 ──────────────────────────────────────────────
+            "1_2.5": { imax: 80, jmax: 127, half_LE_ratio: 1.80 / 3, i_blade: 44, blade_Points: 38, aStrength: 1.50, qStrength: 1.0, pCenterMinWeight: 0.4, pWeightPower: 8.0, bDecayRadial: 0.08, bDecayTangential: 1.2, qDecayRadial: 0.15, qDecayTangential: 0.08 },
+            "1_5":   { imax: 100, jmax: 199, half_LE_ratio: 1.70 / 3, i_blade: 64, blade_Points: 39, aStrength: 1.65, qStrength: 1.0, pCenterMinWeight: 0.4, pWeightPower: 8.0, bDecayRadial: 0.08, bDecayTangential: 1.2, qDecayRadial: 0.145, qDecayTangential: 0.08 },
+
+            // ── Nblade = 2 ──────────────────────────────────────────────
+            "2_2.5": { imax: 80, jmax: 183, half_LE_ratio: 1.90 / 3, i_blade: 44, blade_Points: 38, aStrength: 1.50, qStrength: 1.0, pCenterMinWeight: 0.4, pWeightPower: 8.0, bDecayRadial: 0.08, bDecayTangential: 1.2, qDecayRadial: 0.15, qDecayTangential: 0.08 },
+            "2_5":   { imax: 100, jmax: 235, half_LE_ratio: 1.75 / 3, i_blade: 64, blade_Points: 39, aStrength: 1.65, qStrength: 1.0, pCenterMinWeight: 0.4, pWeightPower: 8.0, bDecayRadial: 0.08, bDecayTangential: 1.2, qDecayRadial: 0.145, qDecayTangential: 0.08 },
+
+            // ── Nblade = 3 ──────────────────────────────────────────────
+            "3_2.5": { imax: 80, jmax: 241, half_LE_ratio: 2.00 / 3, i_blade: 44, blade_Points: 38, aStrength: 1.50, qStrength: 1.0, pCenterMinWeight: 0.4, pWeightPower: 8.0, bDecayRadial: 0.08, bDecayTangential: 1.2, qDecayRadial: 0.15, qDecayTangential: 0.08 },
+            "3_5":   { imax: 100, jmax: 301, half_LE_ratio: 1.78 / 3, i_blade: 64, blade_Points: 39, aStrength: 1.65, qStrength: 1.0, pCenterMinWeight: 0.4, pWeightPower: 8.0, bDecayRadial: 0.08, bDecayTangential: 1.2, qDecayRadial: 0.145, qDecayTangential: 0.08 },
+
+            // ── Nblade = 4 ──────────────────────────────────────────────
+            "4_2.5": { imax: 80, jmax: 301, half_LE_ratio: 2.30/3, i_blade: 44, blade_Points: 38, aStrength: 1.50, qStrength: 1.0, pCenterMinWeight: 0.4, pWeightPower: 8.0, bDecayRadial: 0.08, bDecayTangential: 1.2, qDecayRadial: 0.16, qDecayTangential: 0.08 },
+            "4_5":   { imax:100, jmax: 361, half_LE_ratio: 1.88/3, i_blade: 64, blade_Points: 38, aStrength: 1.65, qStrength: 1.0, pCenterMinWeight: 0.4, pWeightPower: 8.0, bDecayRadial: 0.08, bDecayTangential: 1.2, qDecayRadial: 0.16, qDecayTangential: 0.08 },
+
+            // ── Nblade = 5 ──────────────────────────────────────────────
+            "5_2.5": { imax: 80, jmax: 356, half_LE_ratio: 2.40/3, i_blade: 44, blade_Points: 38, aStrength: 1.50, qStrength: 1.0, pCenterMinWeight: 0.4, pWeightPower: 8.0, bDecayRadial: 0.08, bDecayTangential: 1.2, qDecayRadial: 0.15, qDecayTangential: 0.08 },
+            "5_5":   { imax:100, jmax: 421, half_LE_ratio: 2.00/3, i_blade: 64, blade_Points: 39, aStrength: 1.65, qStrength: 1.0, pCenterMinWeight: 0.4, pWeightPower: 8.0, bDecayRadial: 0.08, bDecayTangential: 1.2, qDecayRadial: 0.145, qDecayTangential: 0.078 },
+        };
+
+        // テーブルルックアップ: 未登録 or 個別フィールドが null の場合は auto 値を返す
+        function getGridParam(key, field, autoVal) {
+            const entry = GRID_PARAM_TABLE[key];
+            if (!entry) return autoVal;
+            const v = entry[field];
+            return (v !== null && v !== undefined) ? v : autoVal;
+        }
+
+        // CFD設定パラメータ
+        let isCfdRunning = false;
+        let dt = 0.0001;
+        let targetCFL = 0.5; // 固定CFL（可変dt制御）
+        let Re = 10000;
+        const U_inf = 1.0;
+        // TSR: 周速比 λ = Ω·R / U_inf。翼端速度比。
+        // Omega: 角速度 [rad/chord-time]。Omega = TSR * U_inf / r_blade_center。
+        // 慣性系（静止系）で解くため、回転角 Theta_rot は状態変数として保持し時間積分する。
+        let TSR = 2.0;
+        let Omega = 0.0;  // updateCfdParamsFromUi() で r_blade_center から計算
+        let Theta_rot = 0.0;  // 現在の回転角 [rad]。stepFlowSolver で更新。
+
+        // 経過時間・ステップ数の追跡用変数
+        let cfdStepCount = 0;
+        let cfdTotalTime = 0.0;
+
+        let maxCflGlobal = 0.0;
+        let maxDiffGlobal = 0.0;
+
+        const rotCenterX = 0.0;  // 1/4弦長点（前縁-0.25 + 0.25 = 0）
+        const rotCenterY = 0.0;
+
+        function updateCfdParamsFromUi() {
+            let rawRe = parseFloat(reInput.value);
+            if (isNaN(rawRe)) rawRe = 10000;
+
+            // 水平流速Uと翼弦長cを基準に計算
+            Re = Math.max(1000, Math.min(1000000, rawRe));
+            reInput.value = Re;
+
+            // Reの変更に合わせて自動決定
+            const Nblade = Math.max(1, Math.min(5, parseInt(nbladeInput.value) || 3));
+            const r_blade_forGrid = Math.max(0.5, Math.min(5.0, parseFloat(rRotorInput.value) || 2.5));
+            const tableKeyGrid = `${Nblade}_${r_blade_forGrid}`;
+            imax = getGridParam(tableKeyGrid, 'imax', 80);
+            jmax = getGridParam(tableKeyGrid, 'jmax', imax * Nblade + 1);
+
+            const rawTSR = parseFloat(tsrInput.value);
+            TSR = isNaN(rawTSR) ? 4.0 : Math.max(2.0, Math.min(8.0, rawTSR));
+            const r_blade_center = Math.max(0.5, Math.min(5.0, parseFloat(rRotorInput.value) || 2.5));
+            // Omega = λ * U_inf / R  （長さスケール=弦長chord=1で無次元化）
+            Omega = TSR * U_inf / r_blade_center;
+        }
+
+        const getIdx = (i, j) => {
+            const period = jmax - 1;
+            let wrapJ = j % period;
+            if (wrapJ < 0) wrapJ += period;
+            return i * jmax + wrapJ;
+        };
+
+        function generateInitialAlgebraicGrid() {
+
+            bladeInfo = [];
+
+            const Nblade = Math.max(1, Math.min(5, parseInt(nbladeInput.value) || 3));
+            const spacing = 0.5;
+            const r_blade_center = Math.max(2.5, Math.min(5.0, parseFloat(rRotorInput.value) || 2.5));
+
+            const tableKey = `${Nblade}_${r_blade_center}`;
+
+            const auto_i_blade = (() => {
+                const ratio_ref = Math.floor(imax / 1.850) / (imax - 2);
+                const c = 0.02;
+                const log2_r = Math.log(r_blade_center) / Math.LN2;
+                const ratio = Math.max(0.05, Math.min(0.90, ratio_ref + c * (log2_r - 1.0)));
+                return Math.max(2, Math.min(imax - 4, Math.round(ratio * (imax - 2))));
+            })();
+            i_blade = getGridParam(tableKey, 'i_blade', auto_i_blade);
+
+            const r_outer = 25.0;
+            const chord = 1.0;
+            const r_inner = chord / 10.0;
+            const r_blade_inner = r_blade_center - 0.5 * spacing;
+            const r_blade_outer = r_blade_center + 0.5 * spacing;
+
+            // 厚みのみ取得（NACA 00XX 対称翼ベース）
+            const t = getNacaThickness();
+
+            const factor = Nblade / (Math.PI * 2 * r_blade_center);
+            const count = Math.floor((jmax - 1) / Nblade * factor);
+            const auto_bladePoints = Math.floor(1.0 * count) * 2 + 1;
+            const bladePoints = getGridParam(tableKey, 'blade_Points', auto_bladePoints);
+
+            gridX = new Float64Array(imax * jmax);
+            gridY = new Float64Array(imax * jmax);
+            isSolid = new Uint8Array(imax * jmax);
+            jHasBlade = new Uint8Array(jmax);
+
+            // 1. 円形代数格子の生成
+            for (let j = 0; j < jmax; j++) {
+                const theta = 2.0 * Math.PI * j / (jmax - 1);
+                const cosT = Math.cos(theta);
+                const sinT = Math.sin(theta);
+
+                for (let i = 0; i < imax; i++) {
+                    let r;
+                    if (i <= i_blade) {
+                        const s = i / i_blade;
+                        const beta = 2.0;
+                        const stretch = (Math.exp(beta * s) - 1.0) / (Math.exp(beta) - 1.0);
+                        r = r_inner + (r_blade_inner - r_inner) * stretch;
+                    } else {
+                        const s = (i - (i_blade + 1)) / (imax - (i_blade + 1) - 1);
+                        r = r_blade_outer + (r_outer - r_blade_outer) * (Math.exp(3.0 * s) - 1.0) / (Math.exp(3.0) - 1.0);
+                    }
+                    const idx = i * jmax + j;
+                    gridX[idx] = r * cosT;
+                    gridY[idx] = r * sinT;
+                }
+            }
+
+            // 2. 翼型データの書き込み
+            for (let k = 0; k < Nblade; k++) {
+                const thetaBlade = 2.0 * Math.PI * k / Nblade;
+                const tangentialAngle = thetaBlade + 0.5 * Math.PI;
+
+                const c = Math.cos(tangentialAngle);
+                const s = Math.sin(tangentialAngle);
+
+                let jCenter = 0;
+                let minErr = 1.0e30;
+                for (let j = 0; j < jmax - 1; j++) {
+                    const theta = 2.0 * Math.PI * j / (jmax - 1);
+                    let err = Math.abs(theta - thetaBlade);
+                    err = Math.min(err, Math.abs(err - 2.0 * Math.PI));
+                    if (err < minErr) { minErr = err; jCenter = j; }
+                }
+
+                const totalSegments = bladePoints - 1;
+                const half_LE_ratio = getGridParam(tableKey, 'half_LE_ratio', 2.0 / 3.0);
+                const half_LE = Math.round(half_LE_ratio * totalSegments);
+                const half_TE = totalSegments - half_LE;
+
+                for (let n = -half_LE; n <= half_TE; n++) {
+                    let j = jCenter + n;
+                    while (j < 0) j += (jmax - 1);
+                    while (j >= (jmax - 1)) j -= (jmax - 1);
+
+                    const local = (n + half_LE) / totalSegments;
+                    const eps = 0.0001;
+                    const localBiased = Math.pow(local, 0.85);  // leCluster > 1 で前縁集中
+                    const x = eps + (1.0 - 2.0 * eps) * 0.5 * (1.0 - Math.cos(Math.PI * localBiased));
+                    const xs = 1.0 - x;
+
+                    const yt = 5.0 * t * (0.2969 * Math.sqrt(xs) - 0.1260 * xs - 0.3516 * xs * xs + 0.2843 * xs * xs * xs - 0.1015 * xs * xs * xs * xs);
+
+                    // 円弧キャンバー: 3/4弦点(x=0.75)を原点としたローカルx座標で円弧高さを計算
+                    // xu_shifted相当のローカルx = chord*(x - 0.75)
+                    // 円弧高さ yc = R - sqrt(R^2 - localX^2)  (内側へ凸)
+                    const localX = chord * (x - 0.75);
+                    const yc = r_blade_center - Math.sqrt(r_blade_center * r_blade_center - localX * localX);
+                    const dycdx = -localX / Math.sqrt(r_blade_center * r_blade_center - localX * localX);
+
+                    const thetaCamber = Math.atan(dycdx);
+                    const xu = x - yt * Math.sin(thetaCamber);
+                    const yu = yc + yt * Math.cos(thetaCamber);
+                    const xl = x + yt * Math.sin(thetaCamber);
+                    const yl = yc - yt * Math.cos(thetaCamber);
+
+                    // ローカル座標（0.75弦長位置を原点へシフト、yc_at_pivotは円弧定義より0）
+                    const xu_shifted = chord * (xu - 0.75);
+                    const yu_shifted = chord * yu;
+                    const xl_shifted = chord * (xl - 0.75);
+                    const yl_shifted = chord * yl;
+
+                    // Alpha_pitch不要（回転なし）: xuLocal=xu_shifted, yuLocal=yu_shifted
+                    const centerX = r_blade_center * Math.cos(thetaBlade);
+                    const centerY = r_blade_center * Math.sin(thetaBlade);
+
+                    gridX[(i_blade + 1) * jmax + j] = centerX + xl_shifted * c - yl_shifted * s;
+                    gridY[(i_blade + 1) * jmax + j] = centerY + xl_shifted * s + yl_shifted * c;
+                    gridX[i_blade * jmax + j] = centerX + xu_shifted * c - yu_shifted * s;
+                    gridY[i_blade * jmax + j] = centerY + xu_shifted * s + yu_shifted * c;
+
+                    isSolid[i_blade * jmax + j] = 1;
+                    isSolid[(i_blade + 1) * jmax + j] = 1;
+                    jHasBlade[j] = 1;
+                }
+
+                const jLE = (jCenter - half_LE + (jmax - 1)) % (jmax - 1);
+                const jTE = (jCenter + half_TE) % (jmax - 1);
+                bladeInfo.push({
+                    jCenter: jCenter,
+                    jLE: jLE,
+                    jTE: jTE,
+                    half: Math.floor(bladePoints / 2),
+                    centerX: r_blade_center * Math.cos(thetaBlade),
+                    centerY: r_blade_center * Math.sin(thetaBlade)
+                });
+            }
+
+            // 3. 周期境界処理
+            for (let i = 0; i < imax; i++) {
+                gridX[i * jmax + (jmax - 1)] = gridX[i * jmax];
+                gridY[i * jmax + (jmax - 1)] = gridY[i * jmax];
+                isSolid[i * jmax + (jmax - 1)] = isSolid[i * jmax];
+            }
+            jHasBlade[jmax - 1] = jHasBlade[0];
+
+            if (uFlow === null || uFlow.length !== imax * jmax) initCfdBuffers();
+        }
+
+        function smoothGridElliptic() {
+            if (!gridX || !gridY || !isSolid) return;
+
+            const w = 1.5;
+            const tolerance = 1e-3;
+            const maxIter = 1000;
+
+            const Nblade_sm = Math.max(2, Math.min(6, parseInt(nbladeInput.value) || 3));
+            const r_sm = Math.max(1.0, Math.min(10.0, parseFloat(rRotorInput.value) || 2.5));
+            const tableKey_sm = `${Nblade_sm}_${r_sm}`;
+
+            // ─── ソース項の基本強度 ───
+            const aStrength       = getGridParam(tableKey_sm, 'aStrength',        1.5); // P項強度（上面・下面への吸い付き）
+            const qStrength       = getGridParam(tableKey_sm, 'qStrength',        1.0); // Q項強度（前縁・後縁への引き込み）
+
+            // ─── 【新規追加】P項の翼弦方向（コード方向）重み付けパラメータ ───
+            const pCenterMinWeight = getGridParam(tableKey_sm, 'pCenterMinWeight', 0.4); // 翼中心でのP項の最小割合（0.0 〜 1.0。0で中心の吸い付きが完全消失）
+            const pWeightPower     = getGridParam(tableKey_sm, 'pWeightPower',     8.0); // 重みのカーブ形状（2.0で滑らかなU字型、1.0で直線的なV字型）
+
+            // ─── 減衰係数 ───
+            const bDecayRadial     = getGridParam(tableKey_sm, 'bDecayRadial',     0.08);
+            const bDecayTangential = getGridParam(tableKey_sm, 'bDecayTangential', 0.7);
+
+            const qDecayRadial     = getGridParam(tableKey_sm, 'qDecayRadial',     0.3);
+            const qDecayTangential = getGridParam(tableKey_sm, 'qDecayTangential', 0.08);
+
+            const period = jmax - 1;
+
+            for (let iter = 0; iter < maxIter; iter++) {
+                let maxChange = 0.0;
+
+                for (let i = 1; i < imax - 1; i++) {
+                    for (let j = 0; j < jmax - 1; j++) {
+                        const idx = getIdx(i, j);
+                        if (isSolid[idx]) continue; // 固体（翼内部・表面）は固定
+
+                        const idx_ip = getIdx(i + 1, j), idx_im = getIdx(i - 1, j);
+                        const idx_jp = getIdx(i, j + 1), idx_jm = getIdx(i, j - 1);
+                        const idx_ipjp = getIdx(i + 1, j + 1), idx_ipjm = getIdx(i + 1, j - 1);
+                        const idx_imjp = getIdx(i - 1, j + 1), idx_imjm = getIdx(i - 1, j - 1);
+
+                        // メトリクス係数の計算
+                        const x_xi = 0.5 * (gridX[idx_ip] - gridX[idx_im]);
+                        const y_xi = 0.5 * (gridY[idx_ip] - gridY[idx_im]);
+                        const x_eta = 0.5 * (gridX[idx_jp] - gridX[idx_jm]);
+                        const y_eta = 0.5 * (gridY[idx_jp] - gridY[idx_jm]);
+
+                        const alpha = x_eta * x_eta + y_eta * y_eta;
+                        const beta = x_xi * x_eta + y_xi * y_eta;
+                        const gamma = x_xi * x_xi + y_xi * y_xi;
+
+                        const x_xie = 0.25 * (gridX[idx_ipjp] - gridX[idx_ipjm] - gridX[idx_imjp] + gridX[idx_imjm]);
+                        const y_xie = 0.25 * (gridY[idx_ipjp] - gridY[idx_ipjm] - gridY[idx_imjp] + gridY[idx_imjm]);
+
+                        // ─── ソース項 ───
+                        let P = 0.0;
+                        let Q = 0.0;
+
+                        // ─── 前縁・後縁への集中(Q) ───
+                        for (let kb = 0; kb < bladeInfo.length; kb++) {
+                            const b = bladeInfo[kb];
+
+                            let djLE = b.jLE - j;
+                            if (djLE > period / 2) djLE -= period;
+                            if (djLE < -period / 2) djLE += period;
+
+                            let djTE = b.jTE - j;
+                            if (djTE > period / 2) djTE -= period;
+                            if (djTE < -period / 2) djTE += period;
+
+                            Q += qStrength
+                                * Math.sign(djLE)
+                                * Math.exp(-qDecayTangential * Math.abs(djLE));
+
+                            Q += qStrength
+                                * Math.sign(djTE)
+                                * Math.exp(-qDecayTangential * Math.abs(djTE));
+                        }
+
+                        // ─── 翼からの接線方向距離(P用) ───
+                        let nearestBladeDist = period;
+
+                        // 【変更箇所】重み付け計算のために最近接のLE/TE距離も保持する
+                        let nearest_djLE = period;
+                        let nearest_djTE = period;
+
+                        for (let kb = 0; kb < bladeInfo.length; kb++) {
+                            const b = bladeInfo[kb];
+
+                            let djLE = b.jLE - j;
+                            if (djLE > period / 2) djLE -= period;
+                            if (djLE < -period / 2) djLE += period;
+
+                            let djTE = b.jTE - j;
+                            if (djTE > period / 2) djTE -= period;
+                            if (djTE < -period / 2) djTE += period;
+
+                            const dist = Math.min(
+                                Math.abs(djLE),
+                                Math.abs(djTE)
+                            );
+
+                            if (dist < nearestBladeDist) {
+                                nearestBladeDist = dist;
+                                nearest_djLE = Math.abs(djLE); // 絶対値を保持
+                                nearest_djTE = Math.abs(djTE); // 絶対値を保持
+                            }
+                        }
+
+                        const hasBlade = (jHasBlade[j] === 1);
+                        const dj_from_blade = hasBlade ? 0 : nearestBladeDist;
+
+                        // ─── 翼からの放射方向距離(Q用) ───
+                        const di_from_blade =
+                            (i < i_blade) ? (i_blade - i) :
+                                (i > i_blade + 1) ? (i - (i_blade + 1)) :
+                                    0;
+
+                        // ─── P用ターゲット位置 ───
+                        let target_i = i_blade;
+
+                        if (hasBlade) {
+                            target_i =
+                                (i <= i_blade)
+                                    ? i_blade
+                                    : i_blade + 1;
+                        }
+
+                        const di = target_i - i;
+
+                        // ─── 【新規追加】P用の翼弦方向（コード方向）重み付け計算 ───
+                        let pChordWeight = 1.0;
+                        // 翼面上 (hasBlade === true) の場合のみ重みを適用し、後流などの空間では通常の強度を維持する
+                        if (hasBlade && (nearest_djLE + nearest_djTE) > 0) {
+                            // 中心で 0.0、LE/TEで 1.0 になる正規化パラメータを作成
+                            const t = Math.abs(nearest_djLE - nearest_djTE) / (nearest_djLE + nearest_djTE);
+
+                            // pCenterMinWeight を底上げとして、両端で 1.0 になるカーブを計算
+                            pChordWeight = pCenterMinWeight + (1.0 - pCenterMinWeight) * Math.pow(t, pWeightPower);
+                        }
+
+                        // ─── P ───
+                        // 【変更箇所】aStrength に pChordWeight を掛け合わせる
+                        P =
+                            Math.sign(di)
+                            * (aStrength * pChordWeight)
+                            * Math.exp(-bDecayRadial * Math.abs(di))
+                            * Math.exp(-bDecayTangential * dj_from_blade);
+
+                        // ─── Q ───
+                        Q *= Math.exp(
+                            -qDecayRadial * di_from_blade
+                        );
+
+                        // ─── 座標更新（SOR法） ───
+                        const denom = 2.0 * (alpha + gamma);
+                        if (denom === 0) continue;
+
+                        const targetX = (
+                            alpha * (gridX[idx_ip] + gridX[idx_im]) +
+                            gamma * (gridX[idx_jp] + gridX[idx_jm]) -
+                            2.0 * beta * x_xie +
+                            alpha * P * x_xi +
+                            gamma * Q * x_eta
+                        ) / denom;
+
+                        const targetY = (
+                            alpha * (gridY[idx_ip] + gridY[idx_im]) +
+                            gamma * (gridY[idx_jp] + gridY[idx_jm]) -
+                            2.0 * beta * y_xie +
+                            alpha * P * y_xi +
+                            gamma * Q * y_eta
+                        ) / denom;
+
+                        const dx = w * (targetX - gridX[idx]);
+                        const dy = w * (targetY - gridY[idx]);
+                        const change = Math.max(Math.abs(dx), Math.abs(dy));
+                        if (change > maxChange) maxChange = change;
+
+                        gridX[idx] += dx;
+                        gridY[idx] += dy;
+                    }
+                }
+
+                // 周期境界の同期
+                for (let i = 0; i < imax; i++) {
+                    gridX[i * jmax + (jmax - 1)] = gridX[i * jmax];
+                    gridY[i * jmax + (jmax - 1)] = gridY[i * jmax];
+                }
+
+                if (maxChange < tolerance) {
+                    console.log(`Elliptic smoothing converged at iter ${iter}`);
+                    break;
+                }
+            }
+
+            computeMetrics();
+        }
+
+        function computeMetrics() {
+            const size = imax * jmax;
+            metrics = {
+                xi_x: new Float64Array(size), xi_y: new Float64Array(size),
+                eta_x: new Float64Array(size), eta_y: new Float64Array(size),
+                J: new Float64Array(size),
+                alpha: new Float64Array(size), beta: new Float64Array(size), gamma: new Float64Array(size)
+            };
+
+            for (let i = 0; i < imax; i++) {
+                for (let j = 0; j < jmax - 1; j++) {
+                    const idx = getIdx(i, j);
+                    const ip = getIdx(Math.min(imax - 1, i + 1), j);
+                    const im = getIdx(Math.max(0, i - 1), j);
+                    const jp = getIdx(i, j + 1);
+                    const jm = getIdx(i, j - 1);
+
+                    const x_xi = 0.5 * (gridX[ip] - gridX[im]);
+                    const y_xi = 0.5 * (gridY[ip] - gridY[im]);
+                    const x_eta = 0.5 * (gridX[jp] - gridX[jm]);
+                    const y_eta = 0.5 * (gridY[jp] - gridY[jm]);
+
+                    const Jac = x_xi * y_eta - x_eta * y_xi;
+                    metrics.J[idx] = Jac;
+
+                    const invJ = 1.0 / Jac;
+                    metrics.xi_x[idx] = y_eta * invJ;
+                    metrics.xi_y[idx] = -x_eta * invJ;
+                    metrics.eta_x[idx] = -y_xi * invJ;
+                    metrics.eta_y[idx] = x_xi * invJ;
+
+                    metrics.alpha[idx] = x_eta * x_eta + y_eta * y_eta;
+                    metrics.beta[idx] = x_xi * x_eta + y_xi * y_eta;
+                    metrics.gamma[idx] = x_xi * x_xi + y_xi * y_xi;
+                }
+            }
+
+            // ─── 中心特異点(i=0)の処理 ───────────────────────────────────────
+            // r=0 では全j線が1点に収束しヤコビアンが0になるため、
+            // i=1 の周方向平均値で埋めて数値的安定性を確保する
+            {
+                let avg = { xi_x: 0, xi_y: 0, eta_x: 0, eta_y: 0, J: 0, alpha: 0, beta: 0, gamma: 0 };
+                const N = jmax - 1;
+                for (let j = 0; j < N; j++) {
+                    const src = getIdx(1, j);
+                    avg.xi_x += metrics.xi_x[src];
+                    avg.xi_y += metrics.xi_y[src];
+                    avg.eta_x += metrics.eta_x[src];
+                    avg.eta_y += metrics.eta_y[src];
+                    avg.J += metrics.J[src];
+                    avg.alpha += metrics.alpha[src];
+                    avg.beta += metrics.beta[src];
+                    avg.gamma += metrics.gamma[src];
+                }
+                for (const k of Object.keys(avg)) avg[k] /= N;
+                for (let j = 0; j < jmax; j++) {
+                    const idx = getIdx(0, j);
+                    metrics.xi_x[idx] = avg.xi_x;
+                    metrics.xi_y[idx] = avg.xi_y;
+                    metrics.eta_x[idx] = avg.eta_x;
+                    metrics.eta_y[idx] = avg.eta_y;
+                    metrics.J[idx] = avg.J;
+                    metrics.alpha[idx] = avg.alpha;
+                    metrics.beta[idx] = avg.beta;
+                    metrics.gamma[idx] = avg.gamma;
+                }
+            }
+            // ─────────────────────────────────────────────────────────────────
+        }
+
+        function initCfdBuffers() {
+            const size = imax * jmax;
+            uFlow = new Float64Array(size);
+            vFlow = new Float64Array(size);
+            pFlow = new Float64Array(size);
+            uFlowTmp = new Float64Array(size);
+            vFlowTmp = new Float64Array(size);
+            uInertia = new Float64Array(size);
+            vInertia = new Float64Array(size);
+            rhsU = new Float64Array(size);
+            rhsV = new Float64Array(size);
+            JU = new Float64Array(size);
+            JV = new Float64Array(size);
+            src = new Float64Array(size);
+
+            // 初期条件: 回転座標系での慣性流（翼は静止）
+            for (let i = 0; i < size; i++) {
+                uFlow[i] = 0.0;
+                vFlow[i] = 0.0;
+                pFlow[i] = 0.0;
+            }
+            for (let i = 1; i < imax; i++) {
+                for (let j = 0; j < jmax; j++) {
+                    const idx = getIdx(i, j);
+                    const x = gridX[idx];
+                    const y = gridY[idx];
+
+                    uFlow[idx] = U_inf + Omega * y;
+                    vFlow[idx] = -Omega * x;
+                }
+            }
+
+            Theta_rot = 0.0;
+
+            maxCflGlobal = 0.0;
+            maxDiffGlobal = 0.0;
+
+            cfdStepCount = 0;
+            cfdTotalTime = 0.0;
+
+            computeMetrics();
+        }
+
+        function computeStabilityParameters(idx) {
+            const U = metrics.xi_x[idx] * uFlow[idx] + metrics.xi_y[idx] * vFlow[idx];
+            const V = metrics.eta_x[idx] * uFlow[idx] + metrics.eta_y[idx] * vFlow[idx];
+            const cfl = (Math.abs(U) + Math.abs(V)) * dt;
+
+            const J2 = metrics.J[idx] ** 2;
+            const diff = ((metrics.alpha[idx] + metrics.gamma[idx]) / (J2 * Re)) * dt;
+            return { cfl, diff };
+        }
+
+        function computeAdaptiveDt() {
+            if (!metrics || !uFlow || !vFlow) return;
+            let maxConv = 0.0;
+            let maxDiff = 0.0;
+            for (let i = 1; i < imax - 1; i++) {
+                for (let j = 0; j < jmax - 1; j++) {
+                    const idx = getIdx(i, j);
+                    const U = metrics.xi_x[idx] * uFlow[idx] + metrics.xi_y[idx] * vFlow[idx];
+                    const V = metrics.eta_x[idx] * uFlow[idx] + metrics.eta_y[idx] * vFlow[idx];
+                    const conv = Math.abs(U) + Math.abs(V);
+                    if (conv > maxConv) maxConv = conv;
+                    const J2 = metrics.J[idx] ** 2;
+                    if (J2 > 1.0e-24) {
+                        const diff = (metrics.alpha[idx] + metrics.gamma[idx]) / (J2 * Re);
+                        if (diff > maxDiff) maxDiff = diff;
+                    }
+                }
+            }
+            let dtNew = 1.0;
+            if (maxConv > 1.0e-12) dtNew = Math.min(dtNew, targetCFL / maxConv);
+            dt = dtNew;
+        }
+
+        // ─── 翼面 no-slip 境界条件（回転座標系内では翼は静止） ─────────────────
+        // 回転座標系で解いているため、翼表面の相対速度はゼロ。
+        // 関数名は互換性のため維持するが、実質は静止壁 BC (u=v=0)。
+        function applyBladeSurfaceVelocity(uArr, vArr) {
+            for (let j = 0; j < jmax - 1; j++) {
+                const idx_u = getIdx(i_blade, j);
+                const idx_l = getIdx(i_blade + 1, j);
+                if (isSolid[idx_u]) { uArr[idx_u] = 0.0; vArr[idx_u] = 0.0; }
+                if (isSolid[idx_l]) { uArr[idx_l] = 0.0; vArr[idx_l] = 0.0; }
+            }
+        }
+
+        // ─── 圧力 Neumann BC (∂p/∂ξ = 0) ─────────────────────────────────────
+        // 翼上面 (i_blade 行): 内側 i_blade-1 の値を鏡像として与える
+        // 翼下面 (i_blade+1 行): 内側 i_blade+2 の値を鏡像として与える
+        function applyBladePressureNeumann() {
+            for (let j = 0; j < jmax - 1; j++) {
+                if (isSolid[getIdx(i_blade, j)]) {
+                    pFlow[getIdx(i_blade, j)] = pFlow[getIdx(i_blade - 1, j)];
+                    if (isSolid[getIdx(i_blade, j - 1)] === 0) {
+                        pFlow[getIdx(i_blade, j)] = pFlow[getIdx(i_blade, j - 1)];
+                    }
+                    if (isSolid[getIdx(i_blade, j + 1)] === 0) {
+                        pFlow[getIdx(i_blade, j)] = pFlow[getIdx(i_blade, j + 1)];
+                    }
+                }
+                if (isSolid[getIdx(i_blade + 1, j)]) {
+                    pFlow[getIdx(i_blade + 1, j)] = pFlow[getIdx(i_blade + 2, j)];
+                    if (isSolid[getIdx(i_blade + 1, j - 1)] === 0) {
+                        pFlow[getIdx(i_blade + 1, j)] = pFlow[getIdx(i_blade + 1, j - 1)];
+                    }
+                    if (isSolid[getIdx(i_blade + 1, j + 1)] === 0) {
+                        pFlow[getIdx(i_blade + 1, j)] = pFlow[getIdx(i_blade + 1, j + 1)];
+                    }
+                }
+            }
+        }
+        // ────────────────────────────────────────────────────────────────────────
+
+        function stepFlowSolver() {
+
+
+            // ─── 外側境界: 慣性系の水平流を回転座標系に変換 ──────────────────────
+            // 慣性系では (U_inf, 0)。回転座標系から見ると R(-Theta_rot) * (U_inf, 0)。
+            const cosT = Math.cos(-Theta_rot);
+            const sinT = Math.sin(-Theta_rot);
+            const u_inf_rot_x = U_inf * cosT;
+            const u_inf_rot_y = U_inf * sinT;
+
+            for (let j = 0; j < jmax; j++) {
+                uFlow[getIdx(0, j)] = 0.0;
+                vFlow[getIdx(0, j)] = 0.0;
+            }
+            for (let j = 0; j < jmax; j++) {
+                const idx = getIdx(imax - 1, j);
+                const x = gridX[idx];
+                const y = gridY[idx];
+                uFlow[idx] = u_inf_rot_x + Omega * y;
+                vFlow[idx] = u_inf_rot_y - Omega * x;
+            }
+            // ─── 翼面: 回転座標系内で翼は静止 → no-slip（u=v=0） ────────────────
+            applyBladeSurfaceVelocity(uFlow, vFlow);
+
+            let localMaxCfl = 0.0;
+            let localMaxDiff = 0.0;
+            for (let i = 1; i < imax - 1; i++) {
+                for (let j = 0; j < jmax - 1; j++) {
+                    const idx = getIdx(i, j);
+                    const stab = computeStabilityParameters(idx);
+                    if (stab.cfl > localMaxCfl) localMaxCfl = stab.cfl;
+                    if (stab.diff > localMaxDiff) localMaxDiff = stab.diff;
+                }
+            }
+            maxCflGlobal = localMaxCfl;
+            maxDiffGlobal = localMaxDiff;
+
+            computeAdaptiveDt();
+
+            cfdStepCount++;
+            cfdTotalTime += dt;
+            // ─── 回転角の時間積分 ────────────────────────────────────────────────
+            Theta_rot += Omega * dt;
+
+            for (let i = 1; i < imax - 1; i++) {
+                for (let j = 0; j < jmax - 1; j++) {
+                    const idx = getIdx(i, j);
+
+                    // ─── 翼面点はスキップ（後で移動壁BC強制） ───
+                    if (isSolid[idx]) { rhsU[idx] = 0.0; rhsV[idx] = 0.0; continue; }
+
+                    const ip = getIdx(i + 1, j), im = getIdx(i - 1, j);
+                    const jp = getIdx(i, j + 1), jm = getIdx(i, j - 1);
+                    const ipjp = getIdx(i + 1, j + 1), ipjm = getIdx(i + 1, j - 1);
+                    const imjp = getIdx(i - 1, j + 1), imjm = getIdx(i - 1, j - 1);
+                    const ipp = getIdx(i + 2, j), imm = getIdx(i - 2, j);
+                    const jpp = getIdx(i, j + 2), jmm = getIdx(i, j - 2);
+
+                    const U = metrics.xi_x[idx] * uFlow[idx] + metrics.xi_y[idx] * vFlow[idx];
+                    const V = metrics.eta_x[idx] * uFlow[idx] + metrics.eta_y[idx] * vFlow[idx];
+
+                    // ─── 壁面隣接フラグ ───────────────────────────────────────────
+                    const adjWall_ip = isSolid[ip];
+                    const adjWall_im = isSolid[im];
+                    const adjWall_jp = isSolid[jp];
+                    const adjWall_jm = isSolid[jm];
+
+                    let u_xi, v_xi, u_eta, v_eta;
+
+                    const alpha = 3.0;
+
+                    // ─── ξ (i) 方向の移流項 ───
+                    if (adjWall_ip) {
+                        if (U > 0.0) {
+                            u_xi = (2.0 * uFlow[ip] + 3.0 * uFlow[idx] - 6.0 * uFlow[im] + uFlow[imm]) / 6.0;
+                            v_xi = (2.0 * vFlow[ip] + 3.0 * vFlow[idx] - 6.0 * vFlow[im] + vFlow[imm]) / 6.0;
+                        } else {
+                            u_xi = (uFlow[ip] - uFlow[im]) * 0.5;
+                            v_xi = (vFlow[ip] - vFlow[im]) * 0.5;
+                        }
+                    } else if (adjWall_im) {
+                        if (U > 0.0) {
+                            u_xi = (uFlow[ip] - uFlow[im]) * 0.5;
+                            v_xi = (vFlow[ip] - vFlow[im]) * 0.5;
+                        } else {
+                            u_xi = (-2.0 * uFlow[im] - 3.0 * uFlow[idx] + 6.0 * uFlow[ip] - uFlow[ipp]) / 6.0;
+                            v_xi = (-2.0 * vFlow[im] - 3.0 * vFlow[idx] + 6.0 * vFlow[ip] - vFlow[ipp]) / 6.0;
+                        }
+                    } else if (i === 1) {
+                        if (U > 0.0) {
+                            u_xi = (uFlow[ip] - uFlow[im]) * 0.5;
+                            v_xi = (vFlow[ip] - vFlow[im]) * 0.5;
+                        } else {
+                            u_xi = (-2.0 * uFlow[im] - 3.0 * uFlow[idx] + 6.0 * uFlow[ip] - uFlow[ipp]) / 6.0;
+                            v_xi = (-2.0 * vFlow[im] - 3.0 * vFlow[idx] + 6.0 * vFlow[ip] - vFlow[ipp]) / 6.0;
+                        }
+                    } else if (i === imax - 2) {
+                        if (U > 0.0) {
+                            u_xi = uFlow[idx] - uFlow[im];
+                            v_xi = vFlow[idx] - vFlow[im];
+                        } else {
+                            u_xi = uFlow[ip] - uFlow[idx];
+                            v_xi = vFlow[ip] - vFlow[idx];
+                        }
+                    } else {
+                        if (U > 0.0) {
+                            u_xi = ((alpha - 1.0) * uFlow[ipp] + (8.0 - 4.0 * alpha) * uFlow[ip] + 6.0 * alpha * uFlow[idx] - (8.0 + 4.0 * alpha) * uFlow[im] + (1.0 + alpha) * uFlow[imm]) / 12.0;
+                            v_xi = ((alpha - 1.0) * vFlow[ipp] + (8.0 - 4.0 * alpha) * vFlow[ip] + 6.0 * alpha * vFlow[idx] - (8.0 + 4.0 * alpha) * vFlow[im] + (1.0 + alpha) * vFlow[imm]) / 12.0;
+                        } else {
+                            u_xi = (-(1.0 + alpha) * uFlow[ipp] + (8.0 + 4.0 * alpha) * uFlow[ip] - 6.0 * alpha * uFlow[idx] - (8.0 - 4.0 * alpha) * uFlow[im] + (1.0 - alpha) * uFlow[imm]) / 12.0;
+                            v_xi = (-(1.0 + alpha) * vFlow[ipp] + (8.0 + 4.0 * alpha) * vFlow[ip] - 6.0 * alpha * vFlow[idx] - (8.0 - 4.0 * alpha) * vFlow[im] + (1.0 - alpha) * vFlow[imm]) / 12.0;
+                        }
+                    }
+
+                    // ─── η (j) 方向の移流項 ───
+                    if (adjWall_jp) {
+                        if (V > 0.0) {
+                            u_eta = (2.0 * uFlow[jp] + 3.0 * uFlow[idx] - 6.0 * uFlow[jm] + uFlow[jmm]) / 6.0;
+                            v_eta = (2.0 * vFlow[jp] + 3.0 * vFlow[idx] - 6.0 * vFlow[jm] + vFlow[jmm]) / 6.0;
+                        } else {
+                            u_eta = (uFlow[jp] - uFlow[jm]) * 0.5;
+                            v_eta = (vFlow[jp] - vFlow[jm]) * 0.5;
+                        }
+                    } else if (adjWall_jm) {
+                        if (V > 0.0) {
+                            u_eta = (uFlow[jp] - uFlow[jm]) * 0.5;
+                            v_eta = (vFlow[jp] - vFlow[jm]) * 0.5;
+                        } else {
+                            u_eta = (-2.0 * uFlow[jm] - 3.0 * uFlow[idx] + 6.0 * uFlow[jp] - uFlow[jpp]) / 6.0;
+                            v_eta = (-2.0 * vFlow[jm] - 3.0 * vFlow[idx] + 6.0 * vFlow[jp] - vFlow[jpp]) / 6.0;
+                        }
+                    } else {
+                        if (V > 0.0) {
+                            u_eta = ((alpha - 1.0) * uFlow[jpp] + (8.0 - 4.0 * alpha) * uFlow[jp] + 6.0 * alpha * uFlow[idx] - (8.0 + 4.0 * alpha) * uFlow[jm] + (1.0 + alpha) * uFlow[jmm]) / 12.0;
+                            v_eta = ((alpha - 1.0) * vFlow[jpp] + (8.0 - 4.0 * alpha) * vFlow[jp] + 6.0 * alpha * vFlow[idx] - (8.0 + 4.0 * alpha) * vFlow[jm] + (1.0 + alpha) * vFlow[jmm]) / 12.0;
+                        } else {
+                            u_eta = (-(1.0 + alpha) * uFlow[jpp] + (8.0 + 4.0 * alpha) * uFlow[jp] - 6.0 * alpha * uFlow[idx] - (8.0 - 4.0 * alpha) * uFlow[jm] + (1.0 - alpha) * uFlow[jmm]) / 12.0;
+                            v_eta = (-(1.0 + alpha) * vFlow[jpp] + (8.0 + 4.0 * alpha) * vFlow[jp] - 6.0 * alpha * vFlow[idx] - (8.0 - 4.0 * alpha) * vFlow[jm] + (1.0 - alpha) * vFlow[jmm]) / 12.0;
+                        }
+                    }
+
+                    const ab_u = U * u_xi + V * u_eta;
+                    const ab_v = U * v_xi + V * v_eta;
+
+                    // コリオリ力と遠心力をソース項として加算
+                    const up = uFlow[idx], vp = vFlow[idx];
+                    const xp = gridX[idx], yp = gridY[idx];
+                    const f_u = 2.0 * Omega * vp + Omega * Omega * xp;
+                    const f_v = -2.0 * Omega * up + Omega * Omega * yp;
+
+                    rhsU[idx] = uFlow[idx] + dt * (-ab_u + f_u);
+                    rhsV[idx] = vFlow[idx] + dt * (-ab_v + f_v);
+                }
+            }
+
+            for (let j = 0; j < jmax; j++) {
+                rhsU[getIdx(0, j)] = 0.0;
+                rhsV[getIdx(0, j)] = 0.0;
+            }
+            for (let j = 0; j < jmax; j++) {
+                const idx = getIdx(imax - 1, j);
+                const x = gridX[idx];
+                const y = gridY[idx];
+                rhsU[idx] = u_inf_rot_x + Omega * y;
+                rhsV[idx] = u_inf_rot_y - Omega * x;
+            }
+
+            // ─── 翼面 RHS: 回転座標系内で静止壁（u=v=0） ────────────────────────
+            applyBladeSurfaceVelocity(rhsU, rhsV);
+
+            uFlowTmp.set(rhsU);
+            vFlowTmp.set(rhsV);
+
+            const omega_u = 1.0;
+
+            for (let iter = 0; iter < 10; iter++) {
+                for (let i = 1; i < imax - 1; i++) {
+                    for (let j = 0; j < jmax - 1; j++) {
+                        const idx = getIdx(i, j);
+
+                        // ─── 翼面点はスキップ（no-slip 固定済み） ───
+                        if (isSolid[idx]) continue;
+
+                        const ip = getIdx(i + 1, j), im = getIdx(i - 1, j);
+                        const jp = getIdx(i, j + 1), jm = getIdx(i, j - 1);
+                        const ipjp = getIdx(i + 1, j + 1), ipjm = getIdx(i + 1, j - 1);
+                        const imjp = getIdx(i - 1, j + 1), imjm = getIdx(i - 1, j - 1);
+
+                        // ─── スリット横断: スリット境界の隣接点では im/ip の参照を自己に置換 ───
+                        const ip_eff = (i === i_blade && isSolid[ip]) ? idx : ip;
+                        const im_eff = (i === i_blade + 1 && isSolid[im]) ? idx : im;
+
+                        const u_xi_eta = 0.25 * (uFlowTmp[ipjp] - uFlowTmp[ipjm] - uFlowTmp[imjp] + uFlowTmp[imjm]);
+                        const v_xi_eta = 0.25 * (vFlowTmp[ipjp] - vFlowTmp[ipjm] - vFlowTmp[imjp] + vFlowTmp[imjm]);
+
+                        const J2 = metrics.J[idx] ** 2;
+                        const ax = dt * metrics.alpha[idx] / (J2 * Re);
+                        const ay = dt * metrics.gamma[idx] / (J2 * Re);
+                        const abeta = dt * metrics.beta[idx] / (J2 * Re);
+
+                        const denom = 1.0 + 2.0 * ax + 2.0 * ay;
+
+                        const uTarget = (rhsU[idx] + ax * (uFlowTmp[ip_eff] + uFlowTmp[im_eff]) + ay * (uFlowTmp[jp] + uFlowTmp[jm]) - 2.0 * abeta * u_xi_eta) / denom;
+                        const vTarget = (rhsV[idx] + ax * (vFlowTmp[ip_eff] + vFlowTmp[im_eff]) + ay * (vFlowTmp[jp] + vFlowTmp[jm]) - 2.0 * abeta * v_xi_eta) / denom;
+
+                        uFlowTmp[idx] += omega_u * (uTarget - uFlowTmp[idx]);
+                        vFlowTmp[idx] += omega_u * (vTarget - vFlowTmp[idx]);
+                    }
+                }
+            }
+
+            for (let i = 0; i < imax; i++) {
+                for (let j = 0; j < jmax; j++) {
+                    const idx = getIdx(i, j);
+                    const J = metrics.J[idx];
+                    JU[idx] = J * (metrics.xi_x[idx] * uFlowTmp[idx] + metrics.xi_y[idx] * vFlowTmp[idx]);
+                    JV[idx] = J * (metrics.eta_x[idx] * uFlowTmp[idx] + metrics.eta_y[idx] * vFlowTmp[idx]);
+                }
+            }
+
+            for (let i = 1; i < imax - 1; i++) {
+                for (let j = 0; j < jmax - 1; j++) {
+                    const idx = getIdx(i, j);
+                    const ip = getIdx(i + 1, j), im = getIdx(i - 1, j);
+                    const jp = getIdx(i, j + 1), jm = getIdx(i, j - 1);
+                    const J = metrics.J[idx];
+
+                    const dJU_dxi = (JU[ip] - JU[im]) * 0.5;
+                    const dJV_deta = (JV[jp] - JV[jm]) * 0.5;
+
+                    src[idx] = (dJU_dxi + dJV_deta) / J / dt;
+                }
+            }
+
+            const omega_p = 1.8;
+
+            for (let iter = 0; iter < 30; iter++) {
+                for (let i = 1; i < imax - 1; i++) {
+                    for (let j = 0; j < jmax - 1; j++) {
+                        const idx = getIdx(i, j);
+
+                        // ─── 翼面点はスキップ（Neumann BC は反復後に別途適用） ───
+                        if (isSolid[idx]) continue;
+
+                        const ip = getIdx(i + 1, j), im = getIdx(i - 1, j);
+                        const jp = getIdx(i, j + 1), jm = getIdx(i, j - 1);
+                        const ipjp = getIdx(i + 1, j + 1), ipjm = getIdx(i + 1, j - 1);
+                        const imjp = getIdx(i - 1, j + 1), imjm = getIdx(i - 1, j - 1);
+
+                        // ─── スリット横断: 翼面の向こう側参照を自己で代替 (∂p/∂n=0 相当) ───
+                        const ip_eff = (i === i_blade && isSolid[ip]) ? idx : ip;
+                        const im_eff = (i === i_blade + 1 && isSolid[im]) ? idx : im;
+
+                        const pc_xi_eta = 0.25 * (pFlow[ipjp] - pFlow[ipjm] - pFlow[imjp] + pFlow[imjm]);
+                        const denom = 2.0 * (metrics.alpha[idx] + metrics.gamma[idx]);
+
+                        const target = (
+                            metrics.alpha[idx] * (pFlow[ip_eff] + pFlow[im_eff])
+                            + metrics.gamma[idx] * (pFlow[jp] + pFlow[jm])
+                            - 2.0 * metrics.beta[idx] * pc_xi_eta
+                            - (metrics.J[idx] ** 2) * src[idx]
+                        ) / denom;
+
+                        pFlow[idx] += omega_p * (target - pFlow[idx]);
+                    }
+                }
+
+                // ─── 外側境界圧力: p = 0 ─────────────
+                // すでに中間速度に遠心力とコリオリ力を含む
+                for (let j = 0; j < jmax; j++) {
+                    pFlow[getIdx(imax - 1, j)] = 0.0; // Dirichlet (p=0)
+                    //pFlow[getIdx(imax - 1, j)] = pFlow[getIdx(imax - 2, j)]; // Neumann (∂p/∂n=0)
+                }
+
+                for (let j = 0; j < jmax; j++) {
+                    pFlow[getIdx(0, j)] = pFlow[getIdx(1, j)];
+                }
+
+                // ─── 翼面圧力 Neumann BC（各 SOR 反復後に適用） ───
+                applyBladePressureNeumann();
+            }
+
+            for (let i = 1; i < imax - 1; i++) {
+                for (let j = 0; j < jmax - 1; j++) {
+                    const idx = getIdx(i, j);
+
+                    // ─── 翼面点はスキップ（no-slip 固定） ───
+                    if (isSolid[idx]) continue;
+
+                    const ip = getIdx(i + 1, j), im = getIdx(i - 1, j);
+                    const jp = getIdx(i, j + 1), jm = getIdx(i, j - 1);
+
+                    // ─── スリット横断: 圧力差分の im/ip を自己代替 ───
+                    const ip_eff = (i === i_blade && isSolid[ip]) ? idx : ip;
+                    const im_eff = (i === i_blade + 1 && isSolid[im]) ? idx : im;
+
+                    const pc_xi = 0.5 * (pFlow[ip_eff] - pFlow[im_eff]);
+                    const pc_eta = 0.5 * (pFlow[jp] - pFlow[jm]);
+
+                    uFlow[idx] = uFlowTmp[idx] - dt * (metrics.xi_x[idx] * pc_xi + metrics.eta_x[idx] * pc_eta);
+                    vFlow[idx] = vFlowTmp[idx] - dt * (metrics.xi_y[idx] * pc_xi + metrics.eta_y[idx] * pc_eta);
+                }
+            }
+
+            // ─── 速度補正後の移動壁BC再適用 ────────────────────────────────────
+            applyBladeSurfaceVelocity(uFlow, vFlow);
+
+            // ─── Oグリッド周期境界 ────────────────────────────────────
+            for (let i = 0; i < imax; i++) {
+                uFlow[i * jmax + (jmax - 1)] = uFlow[i * jmax + 0];
+                vFlow[i * jmax + (jmax - 1)] = vFlow[i * jmax + 0];
+                pFlow[i * jmax + (jmax - 1)] = pFlow[i * jmax + 0];
+            }
+        }
+
+        function getDiscreteColor(value, minV, maxV, mode) {
+            let norm = (value - minV) / (maxV - minV || 1.0);
+            norm = Math.min(1.0, Math.max(0.0, norm));
+            const bands = 10000;
+            norm = Math.floor(norm * bands) / bands;
+
+            let r = 0, g = 0, b = 0;
+            if (mode === 'colormap_velocity') {
+                // 絶対速度 v = value (0 〜 1+TSR) で直接判定
+                // アンカー: v=0 青, v=1 白, v=2 赤, v=maxV 黄
+                // 0.5刻みで区間の代表色（区間中央のアンカー補間値）をベタ塗り
+                const v = value;
+                const vmax = maxV; // = 1 + TSR
+                // アンカー補間関数（4点: 0=青, 1=白, 2=赤, vmax=黄）
+                function anchorColor(x) {
+                    // anchors: [v, r, g, b]
+                    const anchors = [
+                        [0.0,  0,   0,   255],
+                        [1.0,  255, 255, 255],
+                        [2.0,  255, 0,   0  ],
+                        [vmax, 255, 255, 0  ],
+                    ];
+                    // x以下の最大アンカーとx以上の最小アンカーを線形補間
+                    let lo = anchors[0], hi = anchors[anchors.length - 1];
+                    for (let i = 0; i < anchors.length - 1; i++) {
+                        if (x >= anchors[i][0] && x <= anchors[i+1][0]) {
+                            lo = anchors[i]; hi = anchors[i+1]; break;
+                        }
+                    }
+                    const span = hi[0] - lo[0];
+                    const t = span > 0 ? (x - lo[0]) / span : 0;
+                    return [
+                        Math.round(lo[1] + t * (hi[1] - lo[1])),
+                        Math.round(lo[2] + t * (hi[2] - lo[2])),
+                        Math.round(lo[3] + t * (hi[3] - lo[3])),
+                    ];
+                }
+                // 属する0.5区間の中央値で代表色を決定
+                const bandLo = Math.floor(v / 0.5) * 0.5;
+                const bandMid = Math.min(bandLo + 0.25, vmax);
+                const [rc, gc, bc] = anchorColor(bandMid);
+                r = rc; g = gc; b = bc;
+            }
+            else if (mode === 'colormap_pressure') {
+                if (norm < 0.0909) { r = 200; g = 0; b = 200; } // 1. マゼンタ [-2.00 ～ -1.75]
+                else if (norm < 0.1818) { r = 110; g = 0; b = 220; } // 2. 濃い紫   [-1.75 ～ -1.50]
+                else if (norm < 0.2727) { r = 0; g = 60; b = 240; } // 3. 濃い青   [-1.50 ～ -1.25]
+                else if (norm < 0.3636) { r = 0; g = 140; b = 255; } // 4. 青       [-1.25 ～ -1.00]
+                else if (norm < 0.4545) { r = 0; g = 210; b = 255; } // 5. 水色     [-1.00 ～ -0.75]
+                else if (norm < 0.5455) { r = 0; g = 200; b = 150; } // 6. 青緑     [-0.75 ～ -0.50]
+                else if (norm < 0.6364) { r = 0; g = 160; b = 70; } // 7. 深い緑   [-0.50 ～ -0.25]
+                else if (norm < 0.7273) { r = 130; g = 200; b = 60; } // 8. 薄い緑   [-0.25 ～  0.00]
+                else if (norm < 0.8182) { r = 200; g = 200; b = 30; } // 9. 黄色     [ 0.00 ～ +0.25]
+                else if (norm < 0.9091) { r = 240; g = 120; b = 20; } // 10. オレンジ[+0.25 ～ +0.50]
+                else { r = 240; g = 10; b = 10; } // 11. 濃い赤  [+0.50 ～ +0.75]
+            }
+            else if (mode === 'colormap_vorticity') {
+                if (norm < 0.100) { r = 100; g = 0; b = 200; }
+                else if (norm < 0.250) { r = 0; g = 100; b = 255; }
+                else if (norm < 0.450) { r = 0; g = 220; b = 255; }
+                else if (norm < 0.550) { r = 127; g = 127; b = 127; }
+                else if (norm < 0.750) { r = 240; g = 230; b = 0; }
+                else if (norm < 0.900) { r = 255; g = 110; b = 0; }
+                else { r = 255; g = 0; b = 0; }
+            }
+            // v=0.5〜1.0（薄青）とv=1.0〜1.5（薄赤）の区間は透明度を上げる
+            let alpha = 0.82;
+            if (mode === 'colormap_velocity') {
+                const v = value;
+                if (v >= 0.5 && v < 1.0) alpha = 0.30;
+                else if (v >= 1.0 && v < 1.5) alpha = 0.30;
+            }
+            return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+        }
+
+        // 回転座標系の格子点 (rawX, rawY) を慣性系に変換してキャンバス座標を返す。
+        // 回転座標系は慣性系を -Theta_rot だけ回転したものなので、
+        // 慣性系座標 = R(+Theta_rot) * (rawX, rawY)
+        function getRotatedPos(rawX, rawY) {
+            const cosT = Math.cos(Theta_rot);
+            const sinT = Math.sin(Theta_rot);
+            const dx = rawX - rotCenterX;
+            const dy = rawY - rotCenterY;
+            const xLab = rotCenterX + dx * cosT - dy * sinT;
+            const yLab = rotCenterY + dx * sinT + dy * cosT;
+            return {
+                x: offsetX + xLab * scale,
+                y: offsetY - yLab * scale
+            };
+        }
+
+        // 回転座標系の速度ベクトル (ur, vr) を慣性系に変換する。
+        // (u_lab, v_lab) = R(+Theta_rot) * (ur, vr)
+        function rotateVelToLab(ur, vr) {
+            const cosT = Math.cos(Theta_rot);
+            const sinT = Math.sin(Theta_rot);
+            return {
+                u: ur * cosT - vr * sinT,
+                v: ur * sinT + vr * cosT
+            };
+        }
+
+        function computeTorqueCoefficients() {
+            if (!metrics || !pFlow || !uFlow || !vFlow || !gridX || !gridY) return null;
+
+            // ── 無次元化基準 ──────────────────────────────────────────────────────
+            // 弦長 c=1, U_inf=1, ρ=1 (無次元)
+            // 公転トルク基準: Q_ref = ½ρU_inf²·c·R·Nblade = ½·R·Nblade
+            //   → CQ = Q_orb / (½·R·Nblade)
+            //   → CP = CQ·λ
+            // 自転トルク基準: M_ref = ½ρU_inf²·c²·Nblade = ½·Nblade
+            //   → CM = M_spin / (½·Nblade)
+            // ─────────────────────────────────────────────────────────────────────
+            const R = Math.max(2.5, Math.min(5.0, parseFloat(rRotorInput.value) || 2.5));
+            const Nblade = bladeInfo.length;
+            const inv_Re = 1.0 / Re;
+            const cosTR = Math.cos(Theta_rot);
+            const sinTR = Math.sin(Theta_rot);
+
+            let Q_orb  = 0.0;  // 公転（ローター軸）トルク [回転座標系で積分し後で変換不要: スカラー]
+            let M_spin = 0.0;  // 自転（ピッチ軸）モーメント
+
+            // ── 上面 (i_blade 行)・下面 (i_blade+1 行) を別々に積分 ─────────────
+            // 上面: isSolid[i_blade, j]=1 の点。外向き法線は i 減少方向（外側）。
+            //       隣接流体点: i_blade-1（上面外側）, i_blade-2
+            // 下面: isSolid[i_blade+1, j]=1 の点。外向き法線は i 増加方向（内側）。
+            //       隣接流体点: i_blade+2（下面外側）, i_blade+3
+            //
+            // セグメント [j, j+1] の圧力力:
+            //   上面: dF = -p * n̂ ds, n̂ は (dy, -dx)/ds (j増加方向に沿った左手法線 → 外向き確認後符号決定)
+            //   上面外向き法線: i 減少方向 = gridX[i_blade-1] 側
+            //   下面外向き法線: i 増加方向 = gridX[i_blade+2] 側
+            //
+            // 公転トルク: Q_orb += (x_face * dFy - y_face * dFx)  [回転座標系]
+            //   → 慣性系トルクは同じスカラー値（回転でスカラーは不変）
+            // 自転トルク: M_spin += ((x_face - xc) * dFy - (y_face - yc) * dFx)
+            //   xc, yc: 各ブレードの 3/4 弦点（= bladeInfo.centerX/Y, 回転座標系）
+
+            for (let kb = 0; kb < bladeInfo.length; kb++) {
+                const b = bladeInfo[kb];
+                const xc_rot = b.centerX;  // 回転座標系でのブレード中心
+                const yc_rot = b.centerY;
+
+                // jLE から jTE までの j 範囲を列挙（周期境界wrap対応）
+                const period = jmax - 1;
+                const jLE = b.jLE;
+                const jTE = b.jTE;
+
+                // wrap考慮したj列挙: jLE→jTE をn=0...(bladePoints-1)で回す
+                const bladePoints = b.half * 2 + 1;
+                const half_LE = Math.round((2.0 / 3.0) * (bladePoints - 1));
+
+                for (let n = 0; n < bladePoints - 1; n++) {
+                    // セグメント j → j+1
+                    const jA = (jLE + n)     % period;
+                    const jB = (jLE + n + 1) % period;
+
+                    // ── 上面・下面を関数で共通化 ──────────────────────────────────
+                    // 上面: i_blade 行, 外向き法線は i-1 方向
+                    // 下面: i_blade+1 行, 外向き法線は i+1 方向
+                    for (let side = 0; side < 2; side++) {
+                        const iS   = i_blade + side;          // 0=上面, 1=下面
+                        const di   = (side === 0) ? -1 : +1;  // 外向きi方向
+
+                        const idxA  = getIdx(iS,      jA);
+                        const idxB  = getIdx(iS,      jB);
+
+                        // 翼面点チェック: jA 側が solid でなければスキップ
+                        if (!isSolid[idxA]) continue;
+
+                        const idxA1 = getIdx(iS + di,     jA);
+                        const idxB1 = getIdx(iS + di,     jB);
+                        const idxA2 = getIdx(iS + 2 * di, jA);
+                        const idxB2 = getIdx(iS + 2 * di, jB);
+
+                        // セグメント接線ベクトル (j増加方向)
+                        const dxS = gridX[idxB] - gridX[idxA];
+                        const dyS = gridY[idxB] - gridY[idxA];
+                        const ds  = Math.sqrt(dxS * dxS + dyS * dyS);
+                        if (ds < 1e-12) continue;
+
+                        // 外向き法線: 候補 (dyS, -dxS) を隣接流体点方向との内積で符号確定
+                        const midX  = 0.5 * (gridX[idxA]  + gridX[idxB]);
+                        const midY  = 0.5 * (gridY[idxA]  + gridY[idxB]);
+                        const midX1 = 0.5 * (gridX[idxA1] + gridX[idxB1]);
+                        const midY1 = 0.5 * (gridY[idxA1] + gridY[idxB1]);
+                        const outDirX = midX1 - midX;
+                        const outDirY = midY1 - midY;
+
+                        let nxDs =  dyS;
+                        let nyDs = -dxS;
+                        if (nxDs * outDirX + nyDs * outDirY < 0) {
+                            nxDs = -nxDs; nyDs = -nyDs;
+                        }
+                        const nx_norm = nxDs / ds;
+                        const ny_norm = nyDs / ds;
+
+                        // 圧力項
+                        const p_face = 0.5 * (pFlow[idxA] + pFlow[idxB]);
+                        const dFx_p = -p_face * nxDs;
+                        const dFy_p = -p_face * nyDs;
+
+                        // 粘性項: 壁面法線勾配（2点片側2次精度、no-slip で u_wall=0）
+                        const h1 = 0.5 * (
+                            (gridX[idxA1] - gridX[idxA]) * nx_norm + (gridY[idxA1] - gridY[idxA]) * ny_norm +
+                            (gridX[idxB1] - gridX[idxB]) * nx_norm + (gridY[idxB1] - gridY[idxB]) * ny_norm
+                        );
+                        const h2 = 0.5 * (
+                            (gridX[idxA2] - gridX[idxA]) * nx_norm + (gridY[idxA2] - gridY[idxA]) * ny_norm +
+                            (gridX[idxB2] - gridX[idxB]) * nx_norm + (gridY[idxB2] - gridY[idxB]) * ny_norm
+                        );
+                        let dFx_v = 0.0, dFy_v = 0.0;
+                        if (Math.abs(h1) > 1e-12 && Math.abs(h2 - h1) > 1e-12) {
+                            const denom = h1 * h2 * (h2 - h1);
+                            const u1f = 0.5 * (uFlow[idxA1] + uFlow[idxB1]);
+                            const v1f = 0.5 * (vFlow[idxA1] + vFlow[idxB1]);
+                            const u2f = 0.5 * (uFlow[idxA2] + uFlow[idxB2]);
+                            const v2f = 0.5 * (vFlow[idxA2] + vFlow[idxB2]);
+                            const du_dn = (h2 * h2 * u1f - h1 * h1 * u2f) / denom;
+                            const dv_dn = (h2 * h2 * v1f - h1 * h1 * v2f) / denom;
+                            const nx2 = nx_norm * nx_norm, ny2 = ny_norm * ny_norm, nxny = nx_norm * ny_norm;
+                            dFx_v = inv_Re * (du_dn * (1.0 + nx2) + dv_dn * nxny) * ds;
+                            dFy_v = inv_Re * (dv_dn * (1.0 + ny2) + du_dn * nxny) * ds;
+                        }
+
+                        const dFx = dFx_p + dFx_v;
+                        const dFy = dFy_p + dFy_v;
+
+                        // 公転トルク: r × F (z成分), 回転座標系スカラーは慣性系でも不変
+                        Q_orb  += midX * dFy - midY * dFx;
+                        // 自転モーメント: ブレード中心周り
+                        M_spin += (midX - xc_rot) * dFy - (midY - yc_rot) * dFx;
+                    }
+                }
+            }
+
+            // ── 無次元化 ─────────────────────────────────────────────────────────
+            // 弦長 c=1, U_inf=1, ρ=1 (無次元)
+            //
+            // パワー係数: CP = P / (½ ρ U_inf³ · 2R · L)
+            //   P = Q_orb · Ω = Q_orb · λ U_inf / R
+            //   → CP = Q_orb · λ / (ρ U_inf² · R²)
+            //   → CP 基準: ½ ρ U_inf² · R² （× 2 はここでは 2R/R² = 2/R と吸収）
+            //      実用上: CP = Q_orb · λ / R²  (U_inf=1, ρ=1, 2/2 キャンセル)
+            //
+            // トルク係数: CQ = CP / λ = Q_orb / R²
+            //   基準: ½ ρ U_inf² · R² · N_b ではなく 1ブレードあたりの基準を揃えるため
+            //   ここでは CP を先に計算し CQ = CP/λ とする。
+            const CP = (Q_orb * TSR) / (R * R);
+            const CQ = (TSR > 0) ? CP / TSR : 0;
+            const CM = M_spin / (0.5 * Nblade);
+
+            return { CQ, CP, CM };
+        }
+
+        function renderGrid() {
+            if (!gridX || !gridY) return;
+            const viewMode = viewModeSelect.value;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // 外側境界の平均値でオフセット
+            let pBgMean = 0.0;
+            //if (pFlow) {
+            //    for (let j = 0; j < jmax - 1; j++) {
+            //        pBgMean += pFlow[getIdx(imax - 1, j)];
+            //    }
+            //    pBgMean /= (jmax - 1);
+            //}
+
+            // 慣性系での速度ベクトルを計算
+            for (let i = 0; i < imax; i++) {
+                for (let j = 0; j < jmax; j++) {
+                    const idx = getIdx(i, j);
+                    const x = gridX[idx];
+                    const y = gridY[idx];
+                    uInertia[idx] = uFlow[idx] - Omega * y;
+                    vInertia[idx] = vFlow[idx] + Omega * x;
+                }
+            }
+
+            if (viewMode !== 'meshOnly') {
+
+                for (let i = 0; i < imax - 1; i++) {
+                    for (let j = 0; j < jmax - 1; j++) {
+                        const idx00 = getIdx(i, j), idx10 = getIdx(i + 1, j);
+                        const idx11 = getIdx(i + 1, j + 1), idx01 = getIdx(i, j + 1);
+
+                        const p00 = getRotatedPos(gridX[idx00], gridY[idx00]);
+                        const p10 = getRotatedPos(gridX[idx10], gridY[idx10]);
+                        const p11 = getRotatedPos(gridX[idx11], gridY[idx11]);
+                        const p01 = getRotatedPos(gridX[idx01], gridY[idx01]);
+
+                        let color = "rgba(200,200,200,0.5)";
+
+                        // ─── 修正：前縁・後縁のインデックスを考慮した厳密なスリットセル判定 ───
+                        let isSlitCell = false;
+                        if (i === i_blade) {
+                            for (let kb = 0; kb < bladeInfo.length; kb++) {
+                                const le = bladeInfo[kb].jLE;
+                                const te = bladeInfo[kb].jTE;
+                                if (le < te) {
+                                    // 通常のインデックス配置の場合
+                                    if (j >= le && j < te) {
+                                        isSlitCell = true;
+                                        break;
+                                    }
+                                } else {
+                                    // 周期境界（0番インデックス）を跨いで配置されている場合
+                                    if (j >= le || j < te) {
+                                        isSlitCell = true;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+
+                        if (isSlitCell) {
+                            color = '#ffffff'; // スリット内部（翼内部）を完全に白でマスク
+                        } else if (viewMode === 'velocity' && uInertia && vInertia) {
+                            const ur = 0.25 * (uInertia[idx00] + uInertia[idx10] + uInertia[idx11] + uInertia[idx01]);
+                            const vr = 0.25 * (vInertia[idx00] + vInertia[idx10] + vInertia[idx11] + vInertia[idx01]);
+                            // 回転座標系 → 慣性系に変換（大きさは不変だが念のため変換速度を使用）
+                            const vLab = rotateVelToLab(ur, vr);
+                            color = getDiscreteColor(Math.hypot(vLab.u, vLab.v), 0.0, TSR+1, 'colormap_velocity');
+
+                        } else if (viewMode === 'pressure' && pFlow) {
+                            const p_star = 0.25 * (pFlow[idx00] + pFlow[idx10] + pFlow[idx11] + pFlow[idx01]);
+                            color = getDiscreteColor(p_star - pBgMean, -2.0 * TSR * TSR, 0.75 * TSR * TSR, 'colormap_pressure');
+
+                        } else if (viewMode === 'vorticity' && uInertia && vInertia) {
+                            const idx00 = getIdx(i, j);
+                            const idx10 = getIdx(i + 1, j);
+                            const idx11 = getIdx(i + 1, j + 1);
+                            const idx01 = getIdx(i, j + 1);
+
+                            const x_xi = 0.5 * ((gridX[idx10] - gridX[idx00]) + (gridX[idx11] - gridX[idx01]));
+                            const y_xi = 0.5 * ((gridY[idx10] - gridY[idx00]) + (gridY[idx11] - gridY[idx01]));
+                            const x_eta = 0.5 * ((gridX[idx01] - gridX[idx00]) + (gridX[idx11] - gridX[idx10]));
+                            const y_eta = 0.5 * ((gridY[idx01] - gridY[idx00]) + (gridY[idx11] - gridY[idx10]));
+
+                            const J = x_xi * y_eta - x_eta * y_xi;
+
+                            let vort = 0.0;
+                            if (Math.abs(J) >= 1.0e-12) {
+                                const u_xi = 0.5 * ((uInertia[idx10] - uInertia[idx00]) + (uInertia[idx11] - uInertia[idx01]));
+                                const u_eta = 0.5 * ((uInertia[idx01] - uInertia[idx00]) + (uInertia[idx11] - uInertia[idx10]));
+                                const v_xi = 0.5 * ((vInertia[idx10] - vInertia[idx00]) + (vInertia[idx11] - vInertia[idx01]));
+                                const v_eta = 0.5 * ((vInertia[idx01] - vInertia[idx00]) + (vInertia[idx11] - vInertia[idx10]));
+
+                                const dv_dx = (y_eta * v_xi - y_xi * v_eta) / J;
+                                const du_dy = (x_xi * u_eta - x_eta * u_xi) / J;
+                                vort = dv_dx - du_dy;
+                            }
+                            color = getDiscreteColor(vort, -50.0, 50.0, 'colormap_vorticity');
+                        }
+
+                        ctx.fillStyle = color;
+                        ctx.beginPath();
+                        ctx.moveTo(p00.x, p00.y);
+                        ctx.lineTo(p10.x, p10.y);
+                        ctx.lineTo(p11.x, p11.y);
+                        ctx.lineTo(p01.x, p01.y);
+                        ctx.closePath();
+                        ctx.fill();
+                    }
+                }
+            }
+
+            ctx.strokeStyle = (viewMode === 'meshOnly') ? '#000000' : 'rgba(127, 127, 127, 0.01)';
+            ctx.lineWidth = 0.75;
+
+            for (let i = 0; i < imax; i++) {
+                ctx.beginPath();
+                for (let j = 0; j < jmax; j++) {
+                    const idx = i * jmax + j;
+                    const pt = getRotatedPos(gridX[idx], gridY[idx]);
+                    if (j === 0) ctx.moveTo(pt.x, pt.y);
+                    else ctx.lineTo(pt.x, pt.y);
+                }
+                ctx.stroke();
+            }
+
+            for (let j = 0; j < jmax; j++) {
+                // 現在の j がいずれかの翼の「前縁 (LE)」または「後縁 (TE)」か判定
+                let isLeTe = false;
+                for (let kb = 0; kb < bladeInfo.length; kb++) {
+                    if (j === bladeInfo[kb].jLE || j === bladeInfo[kb].jTE) {
+                        isLeTe = true;
+                        break;
+                    }
+                }
+
+                ctx.beginPath();
+                for (let i = 0; i < imax; i++) {
+                    const idx = i * jmax + j;
+                    const pt = getRotatedPos(gridX[idx], gridY[idx]);
+
+                    if (i === 0) {
+                        ctx.moveTo(pt.x, pt.y);
+                    } else if (i === i_blade + 1 && isSolid[i_blade * jmax + j] === 1 && !isLeTe) {
+                        // 翼表面の点であるが、前縁・後縁「以外」の内部線はスキップ
+                        ctx.moveTo(pt.x, pt.y);
+                    } else {
+                        ctx.lineTo(pt.x, pt.y);
+                    }
+                }
+                ctx.stroke();
+            }
+
+            ctx.strokeStyle = '#000000';
+            ctx.lineWidth = 1.0;
+            ctx.beginPath();
+            for (let j = 0; j < jmax; j++) {
+                const pt = getRotatedPos(gridX[j], gridY[j]);
+                if (j === 0) ctx.moveTo(pt.x, pt.y);
+                else ctx.lineTo(pt.x, pt.y);
+            }
+            ctx.stroke();
+
+            // ─── 回転半径円・支柱円（格子線の上に描画） ────────────────────
+            {
+                const r_bc = Math.max(0.5, Math.min(5.0, parseFloat(rRotorInput.value) || 2.5));
+                const r_strut = 1.0 / 20.0; // chord=1固定, 直径=c/10 → 半径=c/20
+                const cx = offsetX;
+                const cy = offsetY;
+                ctx.save();
+
+                // 回転半径円
+                ctx.strokeStyle = '#000000';
+                ctx.lineWidth = 1.0;
+                ctx.setLineDash([6, 4]); // 6px描画して4px空ける破線
+
+                ctx.beginPath();
+                ctx.arc(cx, cy, r_bc * scale, 0, Math.PI * 2);
+                ctx.stroke();
+
+                ctx.restore();
+            }
+            // ─────────────────────────────────────────────────────────────────
+
+            // ─── 1/4コード長位置（重心記号 ⊕）描画 ──────────────────────────
+            {
+                const markerR = 5; // px
+                ctx.save();
+
+                // 重心記号
+                ctx.strokeStyle = '#000000';
+                ctx.lineWidth = 1.0;
+
+                for (let kb = 0; kb < bladeInfo.length; kb++) {
+                    const b = bladeInfo[kb];
+                    const cp = getRotatedPos(b.centerX, b.centerY);
+                    // 外円
+                    ctx.beginPath();
+                    ctx.arc(cp.x, cp.y, markerR, 0, Math.PI * 2);
+                    ctx.stroke();
+                    // 十字線
+                    ctx.beginPath();
+                    ctx.moveTo(cp.x - markerR, cp.y);
+                    ctx.lineTo(cp.x + markerR, cp.y);
+                    ctx.moveTo(cp.x, cp.y - markerR);
+                    ctx.lineTo(cp.x, cp.y + markerR);
+                    ctx.stroke();
+                }
+                ctx.restore();
+            }
+            // ─────────────────────────────────────────────────────────────────
+            const nacaThick = parseInt(nacaThicknessSelect.value);
+            const airfoilName = `NACA 00${nacaThick < 10 ? '0' + nacaThick : nacaThick}`;
+
+            // ─── ステータスバー ───────────────────────────────────────────────
+            const coeffs = computeTorqueCoefficients();
+            const cflColor = (maxCflGlobal > 1.0) ? "#ff4d4d" : (maxCflGlobal > 0.5) ? "#ffcc00" : "#00ff66";
+            const diffColor = (maxDiffGlobal > 1.0) ? "#ff4d4d" : (maxDiffGlobal > 0.1) ? "#ffcc00" : "#00ff66";
+            const cqColor = coeffs ? (coeffs.CQ > 0 ? "#88ff88" : "#ff8888") : "#ffffff";
+            const cpColor = coeffs ? (coeffs.CP > 0 ? "#88ff88" : "#ff8888") : "#ffffff";
+
+            // 各行: { label, value, color }
+            const rows = [
+                { label: "Airfoil", value: airfoilName, color: "#ffffff" },
+                { label: "# of blades", value: `${bladeInfo.length}`, color: "#ffffff" },
+                { label: "R (=R/c)", value: parseFloat(rRotorInput.value).toFixed(1), color: "#ffffff" },
+                { label: "Grid", value: `${imax} × ${jmax}`, color: "#ffffff" },
+                { label: "Re (=Uc/ν)", value: `${Re}`, color: "#ffffff" },
+                { label: "λ (TSR)", value: TSR.toFixed(1), color: "#ffffff" },
+                { label: "CFL", value: maxCflGlobal.toFixed(4), color: cflColor },
+                { label: "Diff", value: maxDiffGlobal.toFixed(4), color: diffColor },
+                { label: "dt", value: `${dt.toExponential(2)}`, color: "#ffffff" },
+                { label: "t", value: cfdTotalTime.toFixed(5), color: "#ffffff" },
+                ...(coeffs ? [
+                    { label: "CQ (torque)", value: coeffs.CQ.toFixed(4), color: cqColor },
+                    { label: "CP (power)", value: coeffs.CP.toFixed(4), color: cpColor   },
+                    //{ label: "CM", value: coeffs.CM.toFixed(4), color: "#bbaaff" },
+                ] : []),
+            ];
+
+            const SB = { x: 30, y: 20, w: 150, lh: 19, pad: 8 };
+            const sbH = SB.pad * 2 + rows.length * SB.lh;
+            ctx.fillStyle = "rgba(0,0,0,0.80)";
+            ctx.fillRect(SB.x, SB.y, SB.w, sbH);
+            ctx.strokeStyle = "rgba(255,255,255,0.18)";
+            ctx.lineWidth = 1;
+            ctx.strokeRect(SB.x, SB.y, SB.w, sbH);
+
+            const labelX = SB.x + SB.pad;
+            const valueX = SB.x + SB.w - SB.pad;
+            ctx.font = "12px 'Courier New', monospace";
+            rows.forEach((row, ri) => {
+                const y = SB.y + SB.pad + (ri + 0.78) * SB.lh;
+                ctx.fillStyle = "#888888";
+                ctx.textAlign = "left";
+                ctx.fillText(row.label, labelX, y);
+                ctx.fillStyle = row.color;
+                ctx.textAlign = "right";
+                ctx.fillText(row.value, valueX, y);
+            });
+            ctx.textAlign = "left"; // リセット
+
+            // ─── カラーバー描画（色境界＝目盛り） ────────────────────────────
+            if (viewMode !== 'meshOnly') {
+                // velocity カラーバー: 絶対速度 0.5刻み、アンカー補間離散
+                const vmax = TSR + 1;
+                const cbAnchors = [
+                    [0.0,  0,   0,   255],
+                    [1.0,  255, 255, 255],
+                    [2.0,  255, 0,   0  ],
+                    [vmax, 255, 255, 0  ],
+                ];
+                function cbAnchorColor(x) {
+                    let lo = cbAnchors[0], hi = cbAnchors[cbAnchors.length - 1];
+                    for (let i = 0; i < cbAnchors.length - 1; i++) {
+                        if (x >= cbAnchors[i][0] && x <= cbAnchors[i+1][0]) {
+                            lo = cbAnchors[i]; hi = cbAnchors[i+1]; break;
+                        }
+                    }
+                    const span = hi[0] - lo[0];
+                    const t = span > 0 ? (x - lo[0]) / span : 0;
+                    return [
+                        Math.round(lo[1] + t * (hi[1] - lo[1])),
+                        Math.round(lo[2] + t * (hi[2] - lo[2])),
+                        Math.round(lo[3] + t * (hi[3] - lo[3])),
+                    ];
+                }
+                const velSteps = [];
+                for (let v = 0; v < vmax - 1e-9; v += 0.5) {
+                    const vFrom = v;
+                    const vTo   = Math.min(v + 0.5, vmax);
+                    const mid   = Math.min(vFrom + 0.25, vmax);
+                    const [rv, gv, bv] = cbAnchorColor(mid);
+                    velSteps.push({
+                        from: vFrom / vmax, to: vTo / vmax,
+                        fromV: vFrom, toV: vTo,
+                        r: rv, g: gv, b: bv
+                    });
+                }
+                const bands = viewMode === 'velocity' ? velSteps
+                    : viewMode === 'pressure' ? [
+                        { from: 0.0000, to: 0.0909, r: 200, g: 0, b: 200, fromV: -2.00, toV: -1.75 },
+                        { from: 0.0909, to: 0.1818, r: 110, g: 0, b: 220, fromV: -1.75, toV: -1.50 },
+                        { from: 0.1818, to: 0.2727, r: 0, g: 60, b: 240, fromV: -1.50, toV: -1.25 },
+                        { from: 0.2727, to: 0.3636, r: 0, g: 140, b: 255, fromV: -1.25, toV: -1.00 },
+                        { from: 0.3636, to: 0.4545, r: 0, g: 210, b: 255, fromV: -1.00, toV: -0.75 },
+                        { from: 0.4545, to: 0.5455, r: 0, g: 200, b: 150, fromV: -0.75, toV: -0.50 },
+                        { from: 0.5455, to: 0.6364, r: 0, g: 160, b: 70, fromV: -0.50, toV: -0.25 },
+                        { from: 0.6364, to: 0.7273, r: 130, g: 200, b: 60, fromV: -0.25, toV: 0.00 },
+                        { from: 0.7273, to: 0.8182, r: 200, g: 200, b: 30, fromV: 0.00, toV: 0.25 },
+                        { from: 0.8182, to: 0.9091, r: 240, g: 120, b: 20, fromV: 0.25, toV: 0.50 },
+                        { from: 0.9091, to: 1.0000, r: 240, g: 10, b: 10, fromV: 0.50, toV: 0.75 },
+                    ]
+                        : /* vorticity */[
+                            { from: 0.000, to: 0.100, r: 100, g: 0, b: 200 },
+                            { from: 0.100, to: 0.250, r: 0, g: 100, b: 255 },
+                            { from: 0.250, to: 0.450, r: 0, g: 220, b: 255 },
+                            { from: 0.450, to: 0.550, r: 127, g: 127, b: 127 },
+                            { from: 0.550, to: 0.750, r: 240, g: 230, b: 0 },
+                            { from: 0.750, to: 0.900, r: 255, g: 110, b: 0 },
+                            { from: 0.900, to: 1.000, r: 255, g: 0, b: 0 },
+                        ].map(b => ({ ...b, fromV: -50 + b.from * 100, toV: -50 + b.to * 100 }));
+
+                const label = viewMode === 'velocity' ? '|u|' : viewMode === 'pressure' ? 'p' : 'ω';
+                const cbH = Math.floor((canvas.height - 48) / 2);
+                const cbW = 16;
+                const cbX = 38;
+                const cbY = canvas.height - cbH - 28;
+
+                ctx.save();
+
+                bands.forEach(b => {
+                    const y0 = cbY + (1 - b.to) * cbH;
+                    const y1 = cbY + (1 - b.from) * cbH;
+                    ctx.fillStyle = `rgb(${b.r},${b.g},${b.b})`;
+                    ctx.fillRect(cbX, y0, cbW, y1 - y0 + 0.5);
+                });
+
+                ctx.strokeStyle = 'rgba(60,60,60,0.5)';
+                ctx.lineWidth = 0.8;
+                ctx.strokeRect(cbX, cbY, cbW, cbH);
+
+                ctx.font = 'bold 11px "Helvetica Neue", Arial, sans-serif';
+                ctx.fillStyle = '#333';
+                ctx.textAlign = 'center';
+                ctx.fillText(label, cbX + cbW / 2, cbY - 7);
+
+                ctx.font = '10px "Helvetica Neue", Arial, sans-serif';
+                ctx.textAlign = 'left';
+                const drawn = new Set();
+                bands.forEach(b => {
+                    [b.from, b.to].forEach((norm, ki) => {
+                        const val = ki === 0 ? b.fromV : b.toV;
+                        const key = norm.toFixed(6);
+                        if (drawn.has(key)) return;
+                        drawn.add(key);
+                        const py = cbY + (1 - norm) * cbH;
+                        ctx.strokeStyle = 'rgba(0,0,0,0.25)';
+                        ctx.lineWidth = 0.8;
+                        ctx.beginPath(); ctx.moveTo(cbX, py); ctx.lineTo(cbX + cbW, py); ctx.stroke();
+                        ctx.strokeStyle = 'rgba(60,60,60,0.6)';
+                        ctx.lineWidth = 0.8;
+                        ctx.beginPath(); ctx.moveTo(cbX + cbW, py); ctx.lineTo(cbX + cbW + 4, py); ctx.stroke();
+                        const lbl = parseFloat(val.toPrecision(3)).toString();
+                        ctx.fillStyle = '#222';
+                        ctx.fillText(lbl, cbX + cbW + 6, py + 3.5);
+                    });
+                });
+
+                ctx.restore();
+            }
+            // ─────────────────────────────────────────────────────────────────
+
+            // ─── 枠メモリ（目盛り）描画 ───────────────────────────────────────
+            {
+                const W = canvas.width;
+                const H = canvas.height;
+                const tickLen = 6;
+                const minorTickLen = 3;
+                const tickColor = 'rgba(80, 80, 80, 0.85)';
+                const labelColor = '#333333';
+
+                const xMin = -offsetX / scale;
+                const xMax = (W - offsetX) / scale;
+                const yMax = offsetY / scale;
+                const yMin = (offsetY - H) / scale;
+
+                function niceStep(range, maxTicks) {
+                    if (!isFinite(range) || range <= 0) return 1;
+                    const raw = range / maxTicks;
+                    if (!isFinite(raw) || raw <= 0) return 1;
+                    const mag = Math.pow(10, Math.floor(Math.log10(raw)));
+                    const norm = raw / mag;
+                    let step;
+                    if (norm < 1.5) step = 1.0;
+                    else if (norm < 3.5) step = 2.0;
+                    else if (norm < 7.5) step = 5.0;
+                    else step = 10.0;
+                    return step * mag;
+                }
+
+                const majorStep = niceStep(xMax - xMin, 8);
+                const minorDiv = 5;
+                const minorStep = majorStep / minorDiv;
+
+                // 目盛り数が多すぎる場合はスキップ（ズームアウト限界対策）
+                const maxTicks = 500;
+                if ((xMax - xMin) / minorStep > maxTicks || (yMax - yMin) / (niceStep(yMax - yMin, 5) / minorDiv) > maxTicks) {
+                    ctx.restore && ctx.restore();
+                    return;
+                }
+
+                function fmtTick(v, step) {
+                    if (Math.abs(v) < step * 1e-9) return '0';
+                    const decimals = Math.max(0, -Math.floor(Math.log10(step)) + 1);
+                    const s = v.toFixed(Math.min(decimals, 6));
+                    // 小数点がある場合のみ末尾ゼロを除去（整数部のゼロは除去しない）
+                    return s.includes('.') ? s.replace(/\.?0+$/, '') : s;
+                }
+
+                ctx.save();
+                ctx.font = '10px "Helvetica Neue", Arial, sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'top';
+
+                // ── 上辺・下辺（X軸） ──
+                const xStart = Math.ceil(xMin / minorStep) * minorStep;
+                let xIdx = 0;
+                for (let x = xStart; x <= xMax + minorStep * 0.5; x += minorStep, xIdx++) {
+                    const px = Math.round(offsetX + x * scale);
+                    if (px < 0 || px > W) continue;
+                    const isMajor = (Math.round(xStart / minorStep) + xIdx) % minorDiv === 0;
+                    const tLen = isMajor ? tickLen : minorTickLen;
+
+                    ctx.strokeStyle = tickColor;
+                    ctx.lineWidth = isMajor ? 1.2 : 0.7;
+                    ctx.beginPath(); ctx.moveTo(px, 0); ctx.lineTo(px, tLen); ctx.stroke();
+                    ctx.beginPath(); ctx.moveTo(px, H); ctx.lineTo(px, H - tLen); ctx.stroke();
+
+                    if (isMajor) {
+                        const label = fmtTick(x, majorStep);
+                        ctx.fillStyle = labelColor;
+                        ctx.textBaseline = 'top';
+                        ctx.fillText(label, px, tickLen + 2);
+                        ctx.textBaseline = 'bottom';
+                        ctx.fillText(label, px, H - tickLen - 2);
+                        ctx.textBaseline = 'top';
+                    }
+                }
+
+                // ── 左辺・右辺（Y軸） ──
+                const yStep = niceStep(yMax - yMin, 5);
+                const yMinorStep = yStep / minorDiv;
+                const yStart = Math.ceil(yMin / yMinorStep) * yMinorStep;
+                ctx.textBaseline = 'middle';
+                let yIdx = 0;
+                for (let y = yStart; y <= yMax + yMinorStep * 0.5; y += yMinorStep, yIdx++) {
+                    const py = Math.round(offsetY - y * scale);
+                    if (py < 0 || py > H) continue;
+                    const isMajor = (Math.round(yStart / yMinorStep) + yIdx) % minorDiv === 0;
+                    const tLen = isMajor ? tickLen : minorTickLen;
+
+                    ctx.strokeStyle = tickColor;
+                    ctx.lineWidth = isMajor ? 1.2 : 0.7;
+                    ctx.beginPath(); ctx.moveTo(0, py); ctx.lineTo(tLen, py); ctx.stroke();
+                    ctx.beginPath(); ctx.moveTo(W, py); ctx.lineTo(W - tLen, py); ctx.stroke();
+
+                    if (isMajor) {
+                        const label = fmtTick(y, yStep);
+                        ctx.fillStyle = labelColor;
+                        ctx.textAlign = 'left';
+                        ctx.fillText(label, tLen + 3, py);
+                        ctx.textAlign = 'right';
+                        ctx.fillText(label, W - tLen - 3, py);
+                        ctx.textAlign = 'left';
+                    }
+                }
+                ctx.restore();
+            }
+            // ─────────────────────────────────────────────────────────────────
+        }
+
+        function updateAndRender() {
+            updateCfdParamsFromUi();
+            generateInitialAlgebraicGrid();
+            smoothGridElliptic();
+            initCfdBuffers();
+            renderGrid();
+        }
+
+        viewModeSelect.addEventListener('change', renderGrid);
+
+        // Reが変更された際、初期化とグリッド再生成を行う
+        reInput.addEventListener('change', () => {
+            clampInputValue(reInput);
+            updateAndRender();
+        });
+        reInput.addEventListener('input', () => {
+            const validRe = parseInt(reInput.value);
+            if (isNaN(validRe) || validRe < 1000 || validRe > 1000000) return;
+            updateAndRender();
+        });
+
+        // TSRが変更された際、初期化とグリッド再生成を行う
+        tsrInput.addEventListener('input', () => {
+            const v = parseFloat(tsrInput.value);
+            if (isNaN(v) || v < 2 || v > 8) return;
+            updateAndRender();
+        });
+        tsrInput.addEventListener('change', () => {
+            let v = parseFloat(tsrInput.value);
+            if (isNaN(v)) v = 4.0;
+            tsrInput.value = Math.max(2, Math.min(8, v));
+            updateAndRender();
+        });
+
+        // 厚み選択のリスナー（selectのため change イベントのみ）
+        nacaThicknessSelect.addEventListener('change', () => {
+            updateAndRender();
+        });
+
+        // ブレード数のリスナー（selectのため change イベントのみ）
+        nbladeInput.addEventListener('change', () => {
+            updateAndRender();
+        });
+
+        // 回転半径のリスナー（selectのため change イベントのみ）
+        rRotorInput.addEventListener('change', () => {
+            updateAndRender();
+        });
+
+        function cfdLoop() {
+            if (!isCfdRunning) return;
+            for (let step = 0; step < 3; step++) {
+                stepFlowSolver();
+            }
+            renderGrid();
+            requestAnimationFrame(cfdLoop);
+        }
+
+        toggleCfdBtn.addEventListener('click', () => {
+            isCfdRunning = !isCfdRunning;
+            if (isCfdRunning) {
+                toggleCfdBtn.innerText = "Stop";
+                toggleCfdBtn.style.background = "#c0392b";
+                cfdLoop();
+            } else {
+                toggleCfdBtn.innerText = "Start";
+                toggleCfdBtn.style.background = "#e67e22";
+            }
+        });
+
+        resetCfdBtn.addEventListener('click', () => {
+            initCfdBuffers();
+            renderGrid();
+        });
+
+        canvas.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left, mouseY = e.clientY - rect.top;
+
+            const physX = (mouseX - offsetX) / scale;
+            const physY = (offsetY - mouseY) / scale;
+            if (e.deltaY < 0) scale = Math.min(10000, scale * 1.1);
+            else scale = Math.max(10, scale / 1.1);
+            offsetX = mouseX - physX * scale; offsetY = mouseY + physY * scale;
+            renderGrid();
+        });
+
+        canvas.addEventListener('mousedown', (e) => { isDragging = true; startX = e.clientX; startY = e.clientY; });
+        canvas.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+            offsetX += e.clientX - startX; offsetY += e.clientY - startY;
+            startX = e.clientX; startY = e.clientY;
+            renderGrid();
+        });
+        window.addEventListener('mouseup', () => { isDragging = false; });
+
+        // 初期実行
+        updateAndRender();
+    </script>
+</body>
+</html>
