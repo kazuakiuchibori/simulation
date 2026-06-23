@@ -146,21 +146,14 @@
                 <div class="input-item">
                     <label for="nacaThicknessSelect">Circular-arc-cambered NACA 00XX (XX is blade thickness %):</label>
                     <select id="nacaThicknessSelect" style="width:100%;box-sizing:border-box;padding:4px 6px;font-size:12px;border:1px solid #ccc;border-radius:4px;">
-                        <option value="06">NACA 0006</option>
-                        <option value="09">NACA 0009</option>
-                        <option value="12">NACA 0012</option>
+                        //<option value="15">NACA 0015</option>
                         <option value="18" selected>NACA 0018</option>
-                        <option value="15">NACA 0015</option>
-                        <option value="21">NACA 0021</option>
-                        <option value="24">NACA 0024</option>
-                        <option value="27">NACA 0027</option>
-                        <option value="30">NACA 0030</option>
+                        //<option value="21">NACA 0021</option>
                     </select>
                 </div>
                 <div class="input-item">
                     <label for="nbladeInput">Number of blades:</label>
                     <select id="nbladeInput" style="width:100%;box-sizing:border-box;padding:4px 6px;font-size:12px;border:1px solid #ccc;border-radius:4px;">
-                        <option value="1">1</option>
                         <option value="2">2</option>
                         <option value="3" selected>3</option>
                         <option value="4">4</option>
@@ -290,25 +283,21 @@
         //   qDecayTangential  … Q項の接線方向減衰
         // ─────────────────────────────────────────────────────────────────
         const GRID_PARAM_TABLE = {
-            // ── Nblade = 1 ──────────────────────────────────────────────
-            "1_2.5": { imax: 80, jmax: 127, half_LE_ratio: 1.80 / 3, i_blade: 44, blade_Points: 38, aStrength: 1.50, qStrength: 1.0, pCenterMinWeight: 0.4, pWeightPower: 8.0, bDecayRadial: 0.08, bDecayTangential: 1.2, qDecayRadial: 0.15, qDecayTangential: 0.08 },
-            "1_5":   { imax: 100, jmax: 199, half_LE_ratio: 1.70 / 3, i_blade: 64, blade_Points: 39, aStrength: 1.65, qStrength: 1.0, pCenterMinWeight: 0.4, pWeightPower: 8.0, bDecayRadial: 0.08, bDecayTangential: 1.2, qDecayRadial: 0.145, qDecayTangential: 0.08 },
-
             // ── Nblade = 2 ──────────────────────────────────────────────
-            "2_2.5": { imax: 80, jmax: 183, half_LE_ratio: 1.90 / 3, i_blade: 44, blade_Points: 38, aStrength: 1.50, qStrength: 1.0, pCenterMinWeight: 0.4, pWeightPower: 8.0, bDecayRadial: 0.08, bDecayTangential: 1.2, qDecayRadial: 0.15, qDecayTangential: 0.08 },
-            "2_5":   { imax: 100, jmax: 235, half_LE_ratio: 1.75 / 3, i_blade: 64, blade_Points: 39, aStrength: 1.65, qStrength: 1.0, pCenterMinWeight: 0.4, pWeightPower: 8.0, bDecayRadial: 0.08, bDecayTangential: 1.2, qDecayRadial: 0.145, qDecayTangential: 0.08 },
+            "2_2.5": { imax: 80, jmax: 183, half_LE_ratio: 2.10 / 3, i_blade: 44, blade_Points: 38, aStrength: 3.80, qStrength: 1.0, pCenterMinWeight: 0.15, pWeightPower: 8.0, bDecayRadial: 0.08, bDecayTangential: 1.2, qDecayRadial: 0.136, qDecayTangential: 0.08 },
+            "2_5":   { imax: 100, jmax: 235, half_LE_ratio: 1.95 / 3, i_blade: 63, blade_Points: 39, aStrength: 3.90, qStrength: 1.0, pCenterMinWeight: 0.15, pWeightPower: 8.0, bDecayRadial: 0.08, bDecayTangential: 1.2, qDecayRadial: 0.134, qDecayTangential: 0.08 },
 
             // ── Nblade = 3 ──────────────────────────────────────────────
-            "3_2.5": { imax: 80, jmax: 241, half_LE_ratio: 2.00 / 3, i_blade: 44, blade_Points: 38, aStrength: 1.50, qStrength: 1.0, pCenterMinWeight: 0.4, pWeightPower: 8.0, bDecayRadial: 0.08, bDecayTangential: 1.2, qDecayRadial: 0.15, qDecayTangential: 0.08 },
-            "3_5":   { imax: 100, jmax: 301, half_LE_ratio: 1.78 / 3, i_blade: 64, blade_Points: 39, aStrength: 1.65, qStrength: 1.0, pCenterMinWeight: 0.4, pWeightPower: 8.0, bDecayRadial: 0.08, bDecayTangential: 1.2, qDecayRadial: 0.145, qDecayTangential: 0.08 },
+            "3_2.5": { imax: 80, jmax: 244, half_LE_ratio: 2.50 / 3, i_blade: 44, blade_Points: 38, aStrength: 4.00, qStrength: 1.0, pCenterMinWeight: 0.15, pWeightPower: 10.0, bDecayRadial: 0.08, bDecayTangential: 1.2, qDecayRadial: 0.143, qDecayTangential: 0.08 },
+            "3_5":   { imax: 100, jmax: 301, half_LE_ratio: 2.05 / 3, i_blade: 64, blade_Points: 39, aStrength: 4.40, qStrength: 1.0, pCenterMinWeight: 0.15, pWeightPower:11.0, bDecayRadial: 0.08, bDecayTangential: 1.2, qDecayRadial: 0.138, qDecayTangential: 0.08 },
 
             // ── Nblade = 4 ──────────────────────────────────────────────
-            "4_2.5": { imax: 80, jmax: 301, half_LE_ratio: 2.30/3, i_blade: 44, blade_Points: 38, aStrength: 1.50, qStrength: 1.0, pCenterMinWeight: 0.4, pWeightPower: 8.0, bDecayRadial: 0.08, bDecayTangential: 1.2, qDecayRadial: 0.16, qDecayTangential: 0.08 },
-            "4_5":   { imax:100, jmax: 361, half_LE_ratio: 1.88/3, i_blade: 64, blade_Points: 38, aStrength: 1.65, qStrength: 1.0, pCenterMinWeight: 0.4, pWeightPower: 8.0, bDecayRadial: 0.08, bDecayTangential: 1.2, qDecayRadial: 0.16, qDecayTangential: 0.08 },
+            "4_2.5": { imax: 80, jmax: 301, half_LE_ratio: 2.30/3, i_blade: 44, blade_Points: 38, aStrength: 1.60, qStrength: 1.0, pCenterMinWeight: 0.4, pWeightPower: 8.0, bDecayRadial: 0.08, bDecayTangential: 1.2, qDecayRadial: 0.16, qDecayTangential: 0.08 },
+            "4_5":   { imax:100, jmax: 361, half_LE_ratio: 1.88/3, i_blade: 64, blade_Points: 38, aStrength: 1.75, qStrength: 1.0, pCenterMinWeight: 0.4, pWeightPower: 8.0, bDecayRadial: 0.08, bDecayTangential: 1.2, qDecayRadial: 0.16, qDecayTangential: 0.08 },
 
             // ── Nblade = 5 ──────────────────────────────────────────────
-            "5_2.5": { imax: 80, jmax: 356, half_LE_ratio: 2.40/3, i_blade: 44, blade_Points: 38, aStrength: 1.50, qStrength: 1.0, pCenterMinWeight: 0.4, pWeightPower: 8.0, bDecayRadial: 0.08, bDecayTangential: 1.2, qDecayRadial: 0.15, qDecayTangential: 0.08 },
-            "5_5":   { imax:100, jmax: 421, half_LE_ratio: 2.00/3, i_blade: 64, blade_Points: 39, aStrength: 1.65, qStrength: 1.0, pCenterMinWeight: 0.4, pWeightPower: 8.0, bDecayRadial: 0.08, bDecayTangential: 1.2, qDecayRadial: 0.145, qDecayTangential: 0.078 },
+            "5_2.5": { imax: 80, jmax: 361, half_LE_ratio: 3.00/3, i_blade: 44, blade_Points: 38, aStrength: 3.50, qStrength: 1.0, pCenterMinWeight: 0.2, pWeightPower: 10.0, bDecayRadial: 0.08, bDecayTangential: 1.2, qDecayRadial: 0.13, qDecayTangential: 0.08 },
+            "5_5":   { imax:100, jmax: 426, half_LE_ratio: 2.20/3, i_blade: 64, blade_Points: 39, aStrength: 3.70, qStrength: 1.0, pCenterMinWeight: 0.2, pWeightPower: 10.0, bDecayRadial: 0.08, bDecayTangential: 1.2, qDecayRadial: 0.14, qDecayTangential: 0.078 },
         };
 
         // テーブルルックアップ: 未登録 or 個別フィールドが null の場合は auto 値を返す
@@ -351,7 +340,7 @@
             reInput.value = Re;
 
             // Reの変更に合わせて自動決定
-            const Nblade = Math.max(1, Math.min(5, parseInt(nbladeInput.value) || 3));
+            const Nblade = Math.max(2, Math.min(5, parseInt(nbladeInput.value) || 3));
             const r_blade_forGrid = Math.max(0.5, Math.min(5.0, parseFloat(rRotorInput.value) || 2.5));
             const tableKeyGrid = `${Nblade}_${r_blade_forGrid}`;
             imax = getGridParam(tableKeyGrid, 'imax', 80);
@@ -375,7 +364,7 @@
 
             bladeInfo = [];
 
-            const Nblade = Math.max(1, Math.min(5, parseInt(nbladeInput.value) || 3));
+            const Nblade = Math.max(2, Math.min(5, parseInt(nbladeInput.value) || 3));
             const spacing = 0.5;
             const r_blade_center = Math.max(2.5, Math.min(5.0, parseFloat(rRotorInput.value) || 2.5));
 
@@ -460,8 +449,8 @@
                     while (j >= (jmax - 1)) j -= (jmax - 1);
 
                     const local = (n + half_LE) / totalSegments;
-                    const eps = 0.0001;
-                    const localBiased = Math.pow(local, 0.85);  // leCluster > 1 で前縁集中
+                    const eps = 1e-5;
+                    const localBiased = Math.pow(local, 0.75000);  // leCluster > 1 で前縁集中
                     const x = eps + (1.0 - 2.0 * eps) * 0.5 * (1.0 - Math.cos(Math.PI * localBiased));
                     const xs = 1.0 - x;
 
@@ -655,13 +644,22 @@
 
                         // ─── 【新規追加】P用の翼弦方向（コード方向）重み付け計算 ───
                         let pChordWeight = 1.0;
-                        // 翼面上 (hasBlade === true) の場合のみ重みを適用し、後流などの空間では通常の強度を維持する
-                        if (hasBlade && (nearest_djLE + nearest_djTE) > 0) {
-                            // 中心で 0.0、LE/TEで 1.0 になる正規化パラメータを作成
-                            const t = Math.abs(nearest_djLE - nearest_djTE) / (nearest_djLE + nearest_djTE);
 
-                            // pCenterMinWeight を底上げとして、両端で 1.0 になるカーブを計算
-                            pChordWeight = pCenterMinWeight + (1.0 - pCenterMinWeight) * Math.pow(t, pWeightPower);
+                        if (hasBlade && (nearest_djLE + nearest_djTE) > 0) {
+
+                            const t = nearest_djLE / (nearest_djLE + nearest_djTE);
+
+                            if (t <= 0.5) {
+                                // TE側は一定
+                                pChordWeight = pCenterMinWeight;
+                            } else {
+                                // LE側のみ現在の分布
+                                const s = (t - 0.5) / 0.5;   // 0～1 に正規化
+                                pChordWeight =
+                                    pCenterMinWeight +
+                                    (1.0 - pCenterMinWeight) *
+                                    Math.pow(s, pWeightPower);
+                            }
                         }
 
                         // ─── P ───
@@ -1700,10 +1698,14 @@
             const cpColor = coeffs ? (coeffs.CP > 0 ? "#88ff88" : "#ff8888") : "#ffffff";
 
             // 各行: { label, value, color }
+            const _N = bladeInfo.length;
+            const _R = parseFloat(rRotorInput.value);
+            const solidity = (_N * 1.0 / (2.0 * _R)).toFixed(3); // σ = N·c / (2R), c=1
             const rows = [
                 { label: "Airfoil", value: airfoilName, color: "#ffffff" },
-                { label: "# of blades", value: `${bladeInfo.length}`, color: "#ffffff" },
-                { label: "R (=R/c)", value: parseFloat(rRotorInput.value).toFixed(1), color: "#ffffff" },
+                { label: "N (blades)", value: `${_N}`, color: "#ffffff" },
+                { label: "R (radius)", value: _R.toFixed(1), color: "#ffffff" },
+                { label: "σ (solidity)", value: solidity, color: "#ffffff" },
                 { label: "Grid", value: `${imax} × ${jmax}`, color: "#ffffff" },
                 { label: "Re (=Uc/ν)", value: `${Re}`, color: "#ffffff" },
                 { label: "λ (TSR)", value: TSR.toFixed(1), color: "#ffffff" },
@@ -1714,11 +1716,11 @@
                 ...(coeffs ? [
                     { label: "CQ (torque)", value: coeffs.CQ.toFixed(4), color: cqColor },
                     { label: "CP (power)", value: coeffs.CP.toFixed(4), color: cpColor   },
-                    //{ label: "CM", value: coeffs.CM.toFixed(4), color: "#bbaaff" },
+                    //{ label: "CM (pitch)", value: coeffs.CM.toFixed(4), color: "#bbaaff" },
                 ] : []),
             ];
 
-            const SB = { x: 30, y: 20, w: 150, lh: 19, pad: 8 };
+            const SB = { x: 30, y: 20, w: 170, lh: 17, pad: 8 };
             const sbH = SB.pad * 2 + rows.length * SB.lh;
             ctx.fillStyle = "rgba(0,0,0,0.80)";
             ctx.fillRect(SB.x, SB.y, SB.w, sbH);
