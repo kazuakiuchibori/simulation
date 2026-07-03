@@ -1,0 +1,959 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>Web CFD - Sphere</title>
+    <style>
+        body { font-family: 'Helvetica Neue', Arial, sans-serif; background: #fafafa; color: #333; text-align: center; margin: 0; padding: 10px 20px; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        h1 { font-size: 22px; color: #222; margin-bottom: 5px; }
+        p  { font-size: 13px; color: #666; margin-top: 0; margin-bottom: 15px; }
+        .control-panel { background: white; padding: 10px 15px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); margin-bottom: 15px; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; }
+        .control-group { text-align: left; display: flex; flex-direction: column; justify-content: space-between; }
+        .highlight-group { border-left: 3px solid navy;  padding-left: 10px; }
+        .cfd-group       { border-left: 3px solid grey;  padding-left: 10px; }
+        .diag-group      { border-left: 3px solid brown; padding-left: 10px; }
+        label { font-weight: bold; font-size: 11px; display: block; margin-bottom: 3px; color: #555; }
+        .input-item { margin-bottom: 6px; } .input-item:last-child { margin-bottom: 0; }
+        input[type="number"], select, button { width: 100%; box-sizing: border-box; padding: 4px 6px; font-size: 12px; border: 1px solid #ccc; border-radius: 4px; background: white; }
+        button { background: #9b59b6; color: white; border: none; font-weight: bold; cursor: pointer; transition: background 0.2s; }
+        button:hover { background: #8e44ad; }
+        .btn-cfd { background: #e67e22; } .btn-cfd:hover { background: #d35400; }
+        .btn-vtk { background: #27ae60; } .btn-vtk:hover { background: #1e8449; }
+        .btn-container { display: flex; gap: 5px; }
+        canvas { background: #ffffff; border: 1px solid #e0e0e0; border-radius: 6px; box-shadow: 0 6px 16px rgba(0,0,0,0.08); max-width: 100%; height: auto; cursor: grab; }
+        canvas:active { cursor: grabbing; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>Web CFD - Sphere</h1>
+    <p>The unsteady flow around a sphere is simulated, solving the incompressible 3D Navier-Stokes equations on an O-O grid using the FDM.</p>
+    <div class="control-panel">
+        <div class="control-group cfd-group">
+            <div class="input-item">
+                <label for="reInput">Reynolds number (1 ~ 100000):</label>
+                <input type="number" id="reInput" min="1" max="100000" step="1000" value="1000">
+            </div>
+        </div>
+        <div class="control-group highlight-group">
+            <div class="input-item">
+                <label for="viewModeSelect">Visualization:</label>
+                <select id="viewModeSelect">
+                    <option value="meshOnly">Computational grid (x-y plane)</option>
+                    <option value="velocity">Velocity magnitude |u|</option>
+                    <option value="pressure">Pressure p</option>
+                    <option value="vorticity" selected>Vorticity ω_z</option>
+                </select>
+            </div>
+        </div>
+        <div class="control-group diag-group">
+            <div class="input-item">
+                <label>Simulation:</label>
+                <div class="btn-container">
+                    <button id="toggleCfdBtn" class="btn-cfd">Start</button>
+                    <button id="resetCfdBtn" style="background:#7f8c8d;">Refresh</button>
+                </div>
+            </div>
+            <div class="input-item">
+                <label>Export:</label>
+                <button id="exportVtkBtn" class="btn-vtk">Download VTK</button>
+            </div>
+        </div>
+    </div>
+    <canvas id="gridCanvas" width="1200" height="600"></canvas>
+    <div style="margin-top:10px;margin-bottom:10px;display:flex;justify-content:center;align-items:center;gap:10px;">
+        <span style="font-size:13px;color:#555;font-weight:500;">If you wish to support my work,</span>
+        <a href="https://www.buymeacoffee.com/kazuakiuchibori" target="_blank">
+            <img src="https://cdn.buymeacoffee.com/buttons/v2/default-violet.png" alt="Buy Me A Coffee" style="height:32px!important;width:115px!important;border-radius:5px;display:block;">
+        </a>
+    </div>
+    <p style="font-size:12px;color:#888;">(c) 2026 Kazuaki Uchibori</p>
+</div>
+
+<script>
+'use strict';
+
+// ─── DOM ─────────────────────────────────────────────────────────────
+const canvas         = document.getElementById('gridCanvas');
+const ctx            = canvas.getContext('2d');
+const viewModeSelect = document.getElementById('viewModeSelect');
+const reInput        = document.getElementById('reInput');
+const toggleCfdBtn   = document.getElementById('toggleCfdBtn');
+const resetCfdBtn    = document.getElementById('resetCfdBtn');
+const exportVtkBtn   = document.getElementById('exportVtkBtn');
+
+// ════════════════════════════════════════════════════════════════════
+//  格子パラメータ
+//  i: ξ方向（放射, i=0:球面, i=imax-1:外部境界）
+//  j: η方向（極角, j=0:前方よどみθ=0, j=jmax-1:後方よどみθ=π）
+//  k: ζ方向（方位角, 格子点数 kmax=41, 格子数 kmax-1=40=4の倍数）
+//
+//  格子生成: まずξ-η断面(x-r平面)を生成し、X軸まわりにζ回転して3D化
+//    X[i,j,k] = x_2d[i,j]
+//    Y[i,j,k] = r_2d[i,j] * cos(φ_k)
+//    Z[i,j,k] = r_2d[i,j] * sin(φ_k)
+//  主流方向: X方向（θ=0が前方よどみ）
+//
+//  軸上特異点(j=0, j=jmax-1)の差分:
+//    格子数40の場合、90°間隔 → k=0,10,20,30 の4点のみ使用
+// ════════════════════════════════════════════════════════════════════
+// imax, jmax, kmax は格子点数（頂点数）。格子数（セル数）は imax-1, jmax-1, kmax-1。
+// k方向は周期境界のため、方位角方向のセル数 = kmax-1 は4の倍数とする。
+const imax = 41;
+const jmax = 41;
+const kmax = 41;          // 例: 格子数40 → 格子点数41
+
+const N3 = imax * jmax * kmax;
+
+// 物理パラメータ
+const R_sphere = 0.5;
+const R_max    = 10.0;
+const U_inf    = 1.0;    // 主流 X方向
+let   Re       = 100.0;
+
+// CFD状態
+let isCfdRunning  = false;
+let cfdStepCount  = 0;
+let cfdTotalTime  = 0.0;
+let maxCflGlobal  = 0.0;
+let maxDiffGlobal = 0.0;
+let dt            = 0.001;
+const targetCFL   = 0.5;
+
+// 格子・流れ場
+let gX, gY, gZ;
+// ξ-η断面（2D断面座標）
+let gX2d, gR2d;   // [i*jmax+j]
+let uFlow, vFlow, wFlow, pFlow;
+let uFTmp, vFTmp, wFTmp;
+let rhsU, rhsV, rhsW;
+let JU, JV, JW, src;
+let metrics;
+
+// 表示
+let scale    = 130.0;
+let offsetX  = canvas.width * 0.35;
+let offsetY  = canvas.height / 2;
+let isDragging = false, startX = 0, startY = 0;
+
+// ════════════════════════════════════════════════════════════════════
+//  インデックス
+//  k周期: k=kmax-1 と k=0 は同一点
+// ════════════════════════════════════════════════════════════════════
+function idx(i, j, k) {
+    let kw = k % (kmax-1);
+    if (kw < 0) kw += (kmax-1);
+    return i * jmax * kmax + j * kmax + kw;
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  格子生成
+//  Step1: ξ-η断面(x-r平面)を代数的に生成
+//    x[i,j] = R*cosθ + (放射方向距離)*cosθ  = (R+r_dist)*cosθ
+//    r[i,j] = (R+r_dist)*sinθ
+//    ただし球面上は (x,r) = (R*cosθ, R*sinθ)
+//  Step2: X軸まわりにφ=2π*k/(kmax-1) 回転して3D化
+//    X[i,j,k] = x[i,j]
+//    Y[i,j,k] = r[i,j]*cos(φ)
+//    Z[i,j,k] = r[i,j]*sin(φ)
+// ════════════════════════════════════════════════════════════════════
+function generateGrid() {
+    gX2d = new Float64Array(imax * jmax);
+    gR2d = new Float64Array(imax * jmax);
+    gX   = new Float64Array(N3);
+    gY   = new Float64Array(N3);
+    gZ   = new Float64Array(N3);
+
+    // 放射方向格子成長率: Re↑ → 境界層が薄くなるため球面近傍を密に
+    const beta_r = 1.5 + Math.log10(Re);
+
+    // Step1: ξ-η平面 (x-y平面)
+    for (let j = 0; j < jmax; j++) {
+        const theta = Math.PI * j / (jmax - 1);  // 極角 [0,π] (θ=0:前方, θ=π:後方)
+        const cosT  = Math.cos(theta);
+        const sinT  = Math.sin(theta);
+
+        for (let i = 0; i < imax; i++) {
+            const t     = i / (imax - 1);
+            // 放射方向距離（i=0:球面上=0, i=imax-1:R_max）
+            const r_dist =
+                (R_max - R_sphere) *
+                (Math.exp(beta_r * t) - 1.0) /
+                (Math.exp(beta_r) - 1.0);
+            const R_total = R_sphere + r_dist;
+
+            const xij = R_total * cosT;   // x座標（主流方向）
+            const rij = R_total * sinT;   // r座標（径方向）
+
+            gX2d[i * jmax + j] = xij;
+            gR2d[i * jmax + j] = rij;
+        }
+    }
+
+    // Step2: X軸まわり回転 (ζ方向回転) → 3D格子
+    for (let i = 0; i < imax; i++) {
+        for (let j = 0; j < jmax; j++) {
+            const xij = gX2d[i * jmax + j];
+            const rij = gR2d[i * jmax + j];
+            for (let k = 0; k < kmax; k++) {
+                const phi  = 2.0 * Math.PI * k / (kmax-1);
+                const id   = idx(i, j, k);
+                gX[id] = xij;
+                gY[id] = rij * Math.cos(phi);
+                gZ[id] = rij * Math.sin(phi);
+            }
+        }
+    }
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  メトリック計算
+// ════════════════════════════════════════════════════════════════════
+    function computeMetrics() {
+        metrics = {
+            xi_x: new Float64Array(N3), xi_y: new Float64Array(N3), xi_z: new Float64Array(N3),
+            eta_x: new Float64Array(N3), eta_y: new Float64Array(N3), eta_z: new Float64Array(N3),
+            zet_x: new Float64Array(N3), zet_y: new Float64Array(N3), zet_z: new Float64Array(N3),
+            J: new Float64Array(N3),
+            gXX: new Float64Array(N3), gYY: new Float64Array(N3), gZZ: new Float64Array(N3),
+            gXY: new Float64Array(N3), gXZ: new Float64Array(N3), gYZ: new Float64Array(N3),
+        };
+
+        const KQ = (kmax-1) / 4;
+        const KH = (kmax-1) / 2;
+
+        for (let i = 0; i < imax; i++) {
+
+            const ip = Math.min(imax - 1, i + 1);
+            const im = Math.max(0, i - 1);
+            const fi = (ip === im) ? 1.0 : (ip - im);
+
+            for (let j = 0; j < jmax; j++) {
+
+                for (let k = 0; k < (kmax-1); k++) {
+
+                    const id = idx(i, j, k);
+
+                    const idip = idx(ip, j, k);
+                    const idim = idx(im, j, k);
+
+                    const x_xi = (gX[idip] - gX[idim]) / fi;
+                    const y_xi = (gY[idip] - gY[idim]) / fi;
+                    const z_xi = (gZ[idip] - gZ[idim]) / fi;
+
+                    let x_eta, y_eta, z_eta;
+                    let x_zet, y_zet, z_zet;
+
+                    if (j == 0) {
+
+                        const id0 = idx(i, 1, k);
+                        const id90 = idx(i, 1, k + KQ);
+                        const id180 = idx(i, 1, k + KH);
+                        const id270 = idx(i, 1, k - KQ);
+
+                        x_eta = 0.5 * (gX[id0] - gX[id180]);
+                        y_eta = 0.5 * (gY[id0] - gY[id180]);
+                        z_eta = 0.5 * (gZ[id0] - gZ[id180]);
+
+                        x_zet = 0.5 * (gX[id90] - gX[id270]);
+                        y_zet = 0.5 * (gY[id90] - gY[id270]);
+                        z_zet = 0.5 * (gZ[id90] - gZ[id270]);
+
+                    }
+                    else if (j == jmax - 1) {
+
+                        const id0 = idx(i, jmax - 2, k);
+                        const id90 = idx(i, jmax - 2, k + KQ);
+                        const id180 = idx(i, jmax - 2, k + KH);
+                        const id270 = idx(i, jmax - 2, k - KQ);
+
+                        x_eta = 0.5 * (gX[id180] - gX[id0]);
+                        y_eta = 0.5 * (gY[id180] - gY[id0]);
+                        z_eta = 0.5 * (gZ[id180] - gZ[id0]);
+
+                        x_zet = 0.5 * (gX[id90] - gX[id270]);
+                        y_zet = 0.5 * (gY[id90] - gY[id270]);
+                        z_zet = 0.5 * (gZ[id90] - gZ[id270]);
+
+                    }
+                    else {
+
+                        const idjp = idx(i, j + 1, k);
+                        const idjm = idx(i, j - 1, k);
+                        const idkp = idx(i, j, k + 1);
+                        const idkm = idx(i, j, k - 1);
+
+                        x_eta = 0.5 * (gX[idjp] - gX[idjm]);
+                        y_eta = 0.5 * (gY[idjp] - gY[idjm]);
+                        z_eta = 0.5 * (gZ[idjp] - gZ[idjm]);
+
+                        x_zet = 0.5 * (gX[idkp] - gX[idkm]);
+                        y_zet = 0.5 * (gY[idkp] - gY[idkm]);
+                        z_zet = 0.5 * (gZ[idkp] - gZ[idkm]);
+
+                    }
+
+                    const J =
+                        x_xi * (y_eta * z_zet - z_eta * y_zet)
+                        - y_xi * (x_eta * z_zet - z_eta * x_zet)
+                        + z_xi * (x_eta * y_zet - y_eta * x_zet);
+
+                    metrics.J[id] = J;
+
+                    if (Math.abs(J) < 1e-20) continue;
+
+                    const iJ = 1.0 / J;
+
+                    const xi_x = (y_eta * z_zet - z_eta * y_zet) * iJ;
+                    const xi_y = -(x_eta * z_zet - z_eta * x_zet) * iJ;
+                    const xi_z = (x_eta * y_zet - y_eta * x_zet) * iJ;
+
+                    const eta_x = -(y_xi * z_zet - z_xi * y_zet) * iJ;
+                    const eta_y = (x_xi * z_zet - z_xi * x_zet) * iJ;
+                    const eta_z = -(x_xi * y_zet - y_xi * x_zet) * iJ;
+
+                    const zet_x = (y_xi * z_eta - z_xi * y_eta) * iJ;
+                    const zet_y = -(x_xi * z_eta - z_xi * x_eta) * iJ;
+                    const zet_z = (x_xi * y_eta - y_xi * x_eta) * iJ;
+
+                    metrics.xi_x[id] = xi_x;
+                    metrics.xi_y[id] = xi_y;
+                    metrics.xi_z[id] = xi_z;
+
+                    metrics.eta_x[id] = eta_x;
+                    metrics.eta_y[id] = eta_y;
+                    metrics.eta_z[id] = eta_z;
+
+                    metrics.zet_x[id] = zet_x;
+                    metrics.zet_y[id] = zet_y;
+                    metrics.zet_z[id] = zet_z;
+
+                    metrics.gXX[id] = xi_x * xi_x + xi_y * xi_y + xi_z * xi_z;
+                    metrics.gYY[id] = eta_x * eta_x + eta_y * eta_y + eta_z * eta_z;
+                    metrics.gZZ[id] = zet_x * zet_x + zet_y * zet_y + zet_z * zet_z;
+
+                    metrics.gXY[id] = xi_x * eta_x + xi_y * eta_y + xi_z * eta_z;
+                    metrics.gXZ[id] = xi_x * zet_x + xi_y * zet_y + xi_z * zet_z;
+                    metrics.gYZ[id] = eta_x * zet_x + eta_y * zet_y + eta_z * zet_z;
+
+                }
+            }
+        }
+    }
+
+// ════════════════════════════════════════════════════════════════════
+//  初期化（一様流 X方向）
+// ════════════════════════════════════════════════════════════════════
+function initCfdBuffers() {
+    uFlow=new Float64Array(N3); vFlow=new Float64Array(N3); wFlow=new Float64Array(N3);
+    pFlow=new Float64Array(N3);
+    uFTmp=new Float64Array(N3); vFTmp=new Float64Array(N3); wFTmp=new Float64Array(N3);
+    rhsU=new Float64Array(N3); rhsV=new Float64Array(N3); rhsW=new Float64Array(N3);
+    JU=new Float64Array(N3); JV=new Float64Array(N3); JW=new Float64Array(N3);
+    src=new Float64Array(N3);
+
+    for (let n=0; n<N3; n++) {
+        uFlow[n] = U_inf;   // 主流はX方向 (u成分)
+        vFlow[n] = 0.0;
+        wFlow[n] = 0.0;
+        pFlow[n] = 0.0;
+    }
+
+    applyVelocityBC(uFlow, vFlow, wFlow);
+
+    cfdStepCount=0; cfdTotalTime=0.0; maxCflGlobal=0.0; maxDiffGlobal=0.0;
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  Adaptive dt
+// ════════════════════════════════════════════════════════════════════
+function computeAdaptiveDt() {
+    let maxConv=0.0, maxDiff=0.0;
+    for (let i=1; i<imax-1; i++) {
+        for (let j=1; j<jmax-1; j++) {
+            for (let k=0; k<(kmax-1); k++) {
+                const id=idx(i,j,k);
+                const U=metrics.xi_x[id]*uFlow[id]  +metrics.xi_y[id]*vFlow[id]  +metrics.xi_z[id]*wFlow[id];
+                const V=metrics.eta_x[id]*uFlow[id] +metrics.eta_y[id]*vFlow[id] +metrics.eta_z[id]*wFlow[id];
+                const W=metrics.zet_x[id]*uFlow[id] +metrics.zet_y[id]*vFlow[id] +metrics.zet_z[id]*wFlow[id];
+                const conv=Math.abs(U)+Math.abs(V)+Math.abs(W);
+                if (conv>maxConv) maxConv=conv;
+                const J2=metrics.J[id]**2;
+                if (J2>1e-24) {
+                    const diff=(metrics.gXX[id]+metrics.gYY[id]+metrics.gZZ[id])/(J2*Re);
+                    if (diff>maxDiff) maxDiff=diff;
+                }
+            }
+        }
+    }
+    maxDiffGlobal=maxDiff;
+    let dtNew=1.0;
+    if (maxConv>1e-12) dtNew=Math.min(dtNew, targetCFL/maxConv);
+    dt=dtNew;
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  境界条件（速度）
+//  ・i=0: 球面 no-slip
+//  ・i=imax-1: 外部境界 一様流X方向
+//  ・j=0,j=jmax-1: 軸上特異点処理（後述）
+//  ・k: 周期（getIdx内で自動処理）
+// ════════════════════════════════════════════════════════════════════
+function applyVelocityBC(u, v, w) {
+    // i=0: no-slip
+    for (let j=0; j<jmax; j++) for (let k=0; k<(kmax-1); k++) {
+        const id=idx(0,j,k); u[id]=0.0; v[id]=0.0; w[id]=0.0;
+    }
+    // i=imax-1: 一様流（主流X方向）
+    for (let j=0; j<jmax; j++) for (let k=0; k<(kmax-1); k++) {
+        const id=idx(imax-1,j,k); u[id]=U_inf; v[id]=0.0; w[id]=0.0;
+    }
+    // 軸上特異点: i=1..imax-2, j=0 および j=jmax-1
+    applyAxisBC(u, v, w);
+}
+
+
+// ════════════════════════════════════════════════════════════════════
+//  軸上特異点処理（壁面を除く）
+//  軸上(r=0)の正しい軸対称条件:
+//    u_x: 隣接行(j=1, j=jmax-2)の全k平均を軸上値とする
+//    v, w: 径方向速度 = 0 (r=0 では定義より v_r=0)
+// ════════════════════════════════════════════════════════════════════
+function applyAxisBC(u, v, w) {
+    for (let i = 1; i < imax - 1; i++) {
+        // 前方軸 j=0
+        let su = 0, sv = 0, sw = 0;
+        for (let k = 0; k < (kmax-1); k++) { const id = idx(i, 1, k); su += u[id]; sv += v[id]; sw += w[id]; }
+        su /= (kmax-1); sv /= (kmax-1); sw /= (kmax-1);
+        for (let k = 0; k < (kmax-1); k++) { const id = idx(i, 0, k); u[id] = su; v[id] = sv; w[id] = sw; }
+
+        // 後方軸 j=jmax-1
+        su = 0; sv = 0; sw = 0;
+        for (let k = 0; k < (kmax-1); k++) { const id = idx(i, jmax - 2, k); su += u[id]; sv += v[id]; sw += w[id]; }
+        su /= (kmax-1); sv /= (kmax-1); sw /= (kmax-1);
+        for (let k = 0; k < (kmax-1); k++) { const id = idx(i, jmax - 1, k); u[id] = su; v[id] = sv; w[id] = sw; }
+    }
+}
+
+function applyPressureBC(p) {
+    // i=0: ∂p/∂n=0 → p[0]=p[1]
+    for (let j = 0; j < jmax; j++) for (let k = 0; k < (kmax-1); k++) p[idx(0, j, k)] = p[idx(1, j, k)];
+    // i=imax-1: p=0
+    for (let j = 0; j < jmax; j++) for (let k = 0; k < (kmax-1); k++) p[idx(imax - 1, j, k)] = 0.0;
+    // k周期
+    for (let i = 0; i < imax; i++) for (let j = 0; j < jmax; j++) p[idx(i, j, (kmax-1))] = p[idx(i, j, 0)];
+    // 軸上圧力: 隣接行の全k平均
+    for (let i = 1; i < imax - 1; i++) {
+        let sp0 = 0, spN = 0;
+        for (let k = 0; k < (kmax-1); k++) {
+            sp0 += p[idx(i, 1, k)];
+            spN += p[idx(i, jmax - 2, k)];
+        }
+        sp0 /= (kmax-1); spN /= (kmax-1);
+        for (let k = 0; k < (kmax-1); k++) {
+            p[idx(i, 0, k)] = sp0;
+            p[idx(i, jmax - 1, k)] = spN;
+        }
+    }
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  ソルバー
+// ════════════════════════════════════════════════════════════════════
+function stepFlowSolver() {
+    computeAdaptiveDt();
+    cfdStepCount++;
+    cfdTotalTime += dt;
+
+    // ── Step1: 対流項（3次精度upwind） ──────────────────────────────
+    let localMaxCfl = 0.0;
+    const alpha = 3.0;  // 3次upwindパラメータ
+    for (let i=1; i<imax-1; i++) {
+        for (let j=1; j<jmax-1; j++) {
+            for (let k=0; k<(kmax-1); k++) {
+                const id  = idx(i,j,k);
+                const ip  = idx(i+1,j,k), im  = idx(i-1,j,k);
+                const jp  = idx(i,j+1,k), jm  = idx(i,j-1,k);
+                const kp  = idx(i,j,k+1), km  = idx(i,j,k-1);
+                const ipp = idx(i+2,j,k), imm = idx(i-2,j,k);
+                // 軸横断ステンシル: j=1のjmm(j-2=-1), j=jmax-2のjpp(j+2=jmax) → k+(kmax-1)/2の対称点
+                const jmm = (j===1)      ? idx(i, 1,      k+(kmax-1)/2) : idx(i, j-2, k);
+                const jpp = (j===jmax-2) ? idx(i, jmax-2, k+(kmax-1)/2) : idx(i, j+2, k);
+                const kpp = idx(i,j,k+2), kmm = idx(i,j,k-2);
+
+                const U=metrics.xi_x[id]*uFlow[id]  +metrics.xi_y[id]*vFlow[id]  +metrics.xi_z[id]*wFlow[id];
+                const V=metrics.eta_x[id]*uFlow[id] +metrics.eta_y[id]*vFlow[id] +metrics.eta_z[id]*wFlow[id];
+                const W=metrics.zet_x[id]*uFlow[id] +metrics.zet_y[id]*vFlow[id] +metrics.zet_z[id]*wFlow[id];
+
+                const cfl=(Math.abs(U)+Math.abs(V)+Math.abs(W))*dt;
+                if (cfl>localMaxCfl) localMaxCfl=cfl;
+
+                // ξ方向 upwind（元コードと同一）
+                let u_xi, v_xi, w_xi;
+                if (i===1) {
+                    if (U>0) { u_xi=(uFlow[ip]-uFlow[im])*0.5; v_xi=(vFlow[ip]-vFlow[im])*0.5; w_xi=(wFlow[ip]-wFlow[im])*0.5; }
+                    else { u_xi=(-2*uFlow[im]-3*uFlow[id]+6*uFlow[ip]-uFlow[ipp])/6; v_xi=(-2*vFlow[im]-3*vFlow[id]+6*vFlow[ip]-vFlow[ipp])/6; w_xi=(-2*wFlow[im]-3*wFlow[id]+6*wFlow[ip]-wFlow[ipp])/6; }
+                } else if (i===imax-2) {
+                    if (U>0) { u_xi=uFlow[id]-uFlow[im]; v_xi=vFlow[id]-vFlow[im]; w_xi=wFlow[id]-wFlow[im]; }
+                    else { u_xi=uFlow[ip]-uFlow[id]; v_xi=vFlow[ip]-vFlow[id]; w_xi=wFlow[ip]-wFlow[id]; }
+                } else {
+                    if (U>0) {
+                        u_xi=((alpha-1)*uFlow[ipp]+(8-4*alpha)*uFlow[ip]+6*alpha*uFlow[id]-(8+4*alpha)*uFlow[im]+(1+alpha)*uFlow[imm])/12;
+                        v_xi=((alpha-1)*vFlow[ipp]+(8-4*alpha)*vFlow[ip]+6*alpha*vFlow[id]-(8+4*alpha)*vFlow[im]+(1+alpha)*vFlow[imm])/12;
+                        w_xi=((alpha-1)*wFlow[ipp]+(8-4*alpha)*wFlow[ip]+6*alpha*wFlow[id]-(8+4*alpha)*wFlow[im]+(1+alpha)*wFlow[imm])/12;
+                    } else {
+                        u_xi=(-(1+alpha)*uFlow[ipp]+(8+4*alpha)*uFlow[ip]-6*alpha*uFlow[id]-(8-4*alpha)*uFlow[im]+(1-alpha)*uFlow[imm])/12;
+                        v_xi=(-(1+alpha)*vFlow[ipp]+(8+4*alpha)*vFlow[ip]-6*alpha*vFlow[id]-(8-4*alpha)*vFlow[im]+(1-alpha)*vFlow[imm])/12;
+                        w_xi=(-(1+alpha)*wFlow[ipp]+(8+4*alpha)*wFlow[ip]-6*alpha*wFlow[id]-(8-4*alpha)*wFlow[im]+(1-alpha)*wFlow[imm])/12;
+                    }
+                }
+
+                // η方向 upwind
+                let u_eta, v_eta, w_eta;
+                if (V>0) {
+                    u_eta=((alpha-1)*uFlow[jpp]+(8-4*alpha)*uFlow[jp]+6*alpha*uFlow[id]-(8+4*alpha)*uFlow[jm]+(1+alpha)*uFlow[jmm])/12;
+                    v_eta=((alpha-1)*vFlow[jpp]+(8-4*alpha)*vFlow[jp]+6*alpha*vFlow[id]-(8+4*alpha)*vFlow[jm]+(1+alpha)*vFlow[jmm])/12;
+                    w_eta=((alpha-1)*wFlow[jpp]+(8-4*alpha)*wFlow[jp]+6*alpha*wFlow[id]-(8+4*alpha)*wFlow[jm]+(1+alpha)*wFlow[jmm])/12;
+                } else {
+                    u_eta=(-(1+alpha)*uFlow[jpp]+(8+4*alpha)*uFlow[jp]-6*alpha*uFlow[id]-(8-4*alpha)*uFlow[jm]+(1-alpha)*uFlow[jmm])/12;
+                    v_eta=(-(1+alpha)*vFlow[jpp]+(8+4*alpha)*vFlow[jp]-6*alpha*vFlow[id]-(8-4*alpha)*vFlow[jm]+(1-alpha)*vFlow[jmm])/12;
+                    w_eta=(-(1+alpha)*wFlow[jpp]+(8+4*alpha)*wFlow[jp]-6*alpha*wFlow[id]-(8-4*alpha)*wFlow[jm]+(1-alpha)*wFlow[jmm])/12;
+                }
+
+                // ζ方向 upwind（周期→常に4次精度）
+                let u_zet, v_zet, w_zet;
+                if (W>0) {
+                    u_zet=((alpha-1)*uFlow[kpp]+(8-4*alpha)*uFlow[kp]+6*alpha*uFlow[id]-(8+4*alpha)*uFlow[km]+(1+alpha)*uFlow[kmm])/12;
+                    v_zet=((alpha-1)*vFlow[kpp]+(8-4*alpha)*vFlow[kp]+6*alpha*vFlow[id]-(8+4*alpha)*vFlow[km]+(1+alpha)*vFlow[kmm])/12;
+                    w_zet=((alpha-1)*wFlow[kpp]+(8-4*alpha)*wFlow[kp]+6*alpha*wFlow[id]-(8+4*alpha)*wFlow[km]+(1+alpha)*wFlow[kmm])/12;
+                } else {
+                    u_zet=(-(1+alpha)*uFlow[kpp]+(8+4*alpha)*uFlow[kp]-6*alpha*uFlow[id]-(8-4*alpha)*uFlow[km]+(1-alpha)*uFlow[kmm])/12;
+                    v_zet=(-(1+alpha)*vFlow[kpp]+(8+4*alpha)*vFlow[kp]-6*alpha*vFlow[id]-(8-4*alpha)*vFlow[km]+(1-alpha)*vFlow[kmm])/12;
+                    w_zet=(-(1+alpha)*wFlow[kpp]+(8+4*alpha)*wFlow[kp]-6*alpha*wFlow[id]-(8-4*alpha)*wFlow[km]+(1-alpha)*wFlow[kmm])/12;
+                }
+
+                rhsU[id]=uFlow[id]-dt*(U*u_xi+V*u_eta+W*u_zet);
+                rhsV[id]=vFlow[id]-dt*(U*v_xi+V*v_eta+W*v_zet);
+                rhsW[id]=wFlow[id]-dt*(U*w_xi+V*w_eta+W*w_zet);
+            }
+        }
+    }
+    maxCflGlobal=localMaxCfl;
+
+    applyVelocityBC(rhsU, rhsV, rhsW);
+
+    // ── Step2: 拡散項（陰的オイラー法） ─────────────────────────────
+    uFTmp.set(rhsU); vFTmp.set(rhsV); wFTmp.set(rhsW);
+    const omega_gs = 0.8;
+    for (let iter=0; iter<10; iter++) {
+        for (let i=1; i<imax-1; i++) {
+            for (let j=1; j<jmax-1; j++) {
+                for (let k=0; k<(kmax-1); k++) {
+                    const id   = idx(i,j,k);
+                    const ip   = idx(i+1,j,k), im   = idx(i-1,j,k);
+                    const jp   = idx(i,j+1,k), jm   = idx(i,j-1,k);
+                    const kp   = idx(i,j,k+1), km   = idx(i,j,k-1);
+                    const ipjp = idx(i+1,j+1,k), ipjm = idx(i+1,j-1,k);
+                    const imjp = idx(i-1,j+1,k), imjm = idx(i-1,j-1,k);
+                    const ipkp = idx(i+1,j,k+1), ipkm = idx(i+1,j,k-1);
+                    const imkp = idx(i-1,j,k+1), imkm = idx(i-1,j,k-1);
+                    const jpkp = idx(i,j+1,k+1), jpkm = idx(i,j+1,k-1);
+                    const jmkp = idx(i,j-1,k+1), jmkm = idx(i,j-1,k-1);
+
+                    const u_xie = 0.25*(uFTmp[ipjp]-uFTmp[ipjm]-uFTmp[imjp]+uFTmp[imjm]);
+                    const v_xie = 0.25*(vFTmp[ipjp]-vFTmp[ipjm]-vFTmp[imjp]+vFTmp[imjm]);
+                    const w_xie = 0.25*(wFTmp[ipjp]-wFTmp[ipjm]-wFTmp[imjp]+wFTmp[imjm]);
+                    const u_xiz = 0.25*(uFTmp[ipkp]-uFTmp[ipkm]-uFTmp[imkp]+uFTmp[imkm]);
+                    const v_xiz = 0.25*(vFTmp[ipkp]-vFTmp[ipkm]-vFTmp[imkp]+vFTmp[imkm]);
+                    const w_xiz = 0.25*(wFTmp[ipkp]-wFTmp[ipkm]-wFTmp[imkp]+wFTmp[imkm]);
+                    const u_etz = 0.25*(uFTmp[jpkp]-uFTmp[jpkm]-uFTmp[jmkp]+uFTmp[jmkm]);
+                    const v_etz = 0.25*(vFTmp[jpkp]-vFTmp[jpkm]-vFTmp[jmkp]+vFTmp[jmkm]);
+                    const w_etz = 0.25*(wFTmp[jpkp]-wFTmp[jpkm]-wFTmp[jmkp]+wFTmp[jmkm]);
+
+                    const J2 = metrics.J[id] ** 2;
+                    const c=dt/(J2*Re);
+                    const ax=c*metrics.gXX[id]*J2, ay=c*metrics.gYY[id]*J2, az=c*metrics.gZZ[id]*J2;
+                    const axy=c*metrics.gXY[id]*J2, axz=c*metrics.gXZ[id]*J2, ayz=c*metrics.gYZ[id]*J2;
+                    const denom=1.0+2*(ax+ay+az);
+
+                    const uNew=(rhsU[id]+ax*(uFTmp[ip]+uFTmp[im])+ay*(uFTmp[jp]+uFTmp[jm])+az*(uFTmp[kp]+uFTmp[km])+2*axy*u_xie+2*axz*u_xiz+2*ayz*u_etz)/denom;
+                    const vNew=(rhsV[id]+ax*(vFTmp[ip]+vFTmp[im])+ay*(vFTmp[jp]+vFTmp[jm])+az*(vFTmp[kp]+vFTmp[km])+2*axy*v_xie+2*axz*v_xiz+2*ayz*v_etz)/denom;
+                    const wNew=(rhsW[id]+ax*(wFTmp[ip]+wFTmp[im])+ay*(wFTmp[jp]+wFTmp[jm])+az*(wFTmp[kp]+wFTmp[km])+2*axy*w_xie+2*axz*w_xiz+2*ayz*w_etz)/denom;
+                    uFTmp[id] += omega_gs*(uNew-uFTmp[id]);
+                    vFTmp[id] += omega_gs*(vNew-vFTmp[id]);
+                    wFTmp[id] += omega_gs*(wNew-wFTmp[id]);
+                }
+            }
+        }
+        applyVelocityBC(uFTmp, vFTmp, wFTmp);
+    }
+
+    // ── Step3: 圧力Poisson RHS ──────────────────────────────────────
+    for (let i=0; i<imax; i++) for (let j=0; j<jmax; j++) for (let k=0; k<(kmax-1); k++) {
+        const id=idx(i,j,k); const J=metrics.J[id];
+        JU[id]=J*(metrics.xi_x[id]*uFTmp[id]  +metrics.xi_y[id]*vFTmp[id]  +metrics.xi_z[id]*wFTmp[id]);
+        JV[id]=J*(metrics.eta_x[id]*uFTmp[id] +metrics.eta_y[id]*vFTmp[id] +metrics.eta_z[id]*wFTmp[id]);
+        JW[id]=J*(metrics.zet_x[id]*uFTmp[id] +metrics.zet_y[id]*vFTmp[id] +metrics.zet_z[id]*wFTmp[id]);
+    }
+    for (let i=1; i<imax-1; i++) for (let j=1; j<jmax-1; j++) for (let k=0; k<(kmax-1); k++) {
+        const id=idx(i,j,k);
+        src[id]=( (JU[idx(i+1,j,k)]-JU[idx(i-1,j,k)])*0.5
+                 +(JV[idx(i,j+1,k)]-JV[idx(i,j-1,k)])*0.5
+                 +(JW[idx(i,j,k+1)]-JW[idx(i,j,k-1)])*0.5 ) / metrics.J[id] / dt;
+    }
+
+    // ── Step4: 圧力Poisson SOR（30回） ──────────────────────────────
+    const omega_p=1.5;
+    for (let iter=0; iter<30; iter++) {
+        for (let i=1; i<imax-1; i++) {
+            for (let j=1; j<jmax-1; j++) {
+                for (let k=0; k<(kmax-1); k++) {
+                    const id   = idx(i,j,k);
+                    const ip   = idx(i+1,j,k), im   = idx(i-1,j,k);
+                    const jp   = idx(i,j+1,k), jm   = idx(i,j-1,k);
+                    const kp   = idx(i,j,k+1), km   = idx(i,j,k-1);
+                    const ipjp = idx(i+1,j+1,k), ipjm = idx(i+1,j-1,k);
+                    const imjp = idx(i-1,j+1,k), imjm = idx(i-1,j-1,k);
+                    const ipkp = idx(i+1,j,k+1), ipkm = idx(i+1,j,k-1);
+                    const imkp = idx(i-1,j,k+1), imkm = idx(i-1,j,k-1);
+                    const jpkp = idx(i,j+1,k+1), jpkm = idx(i,j+1,k-1);
+                    const jmkp = idx(i,j-1,k+1), jmkm = idx(i,j-1,k-1);
+
+                    const p_xie = 0.25*(pFlow[ipjp]-pFlow[ipjm]-pFlow[imjp]+pFlow[imjm]);
+                    const p_xiz = 0.25*(pFlow[ipkp]-pFlow[ipkm]-pFlow[imkp]+pFlow[imkm]);
+                    const p_etz = 0.25*(pFlow[jpkp]-pFlow[jpkm]-pFlow[jmkp]+pFlow[jmkm]);
+
+                    const J2=metrics.J[id]**2;
+                    const denom=2*(metrics.gXX[id]+metrics.gYY[id]+metrics.gZZ[id])*J2;
+
+                    const target=(
+                        metrics.gXX[id]*J2*(pFlow[ip]+pFlow[im])
+                       +metrics.gYY[id]*J2*(pFlow[jp]+pFlow[jm])
+                       +metrics.gZZ[id]*J2*(pFlow[kp]+pFlow[km])
+                       +2*metrics.gXY[id]*J2*p_xie
+                       +2*metrics.gXZ[id]*J2*p_xiz
+                       +2*metrics.gYZ[id]*J2*p_etz
+                       -J2*src[id]
+                    )/denom;
+                    pFlow[id]+=omega_p*(target-pFlow[id]);
+                }
+            }
+        }
+        applyPressureBC(pFlow);
+    }
+
+    // ── Step5: 速度補正 ──────────────────────────────────────────────
+    for (let i=1; i<imax-1; i++) for (let j=1; j<jmax-1; j++) for (let k=0; k<(kmax-1); k++) {
+        const id=idx(i,j,k);
+        const pc_xi  = 0.5*(pFlow[idx(i+1,j,k)]-pFlow[idx(i-1,j,k)]);
+        const pc_eta = 0.5*(pFlow[idx(i,j+1,k)]-pFlow[idx(i,j-1,k)]);
+        const pc_zet = 0.5*(pFlow[idx(i,j,k+1)]-pFlow[idx(i,j,k-1)]);
+        uFlow[id]=uFTmp[id]-dt*(metrics.xi_x[id]*pc_xi+metrics.eta_x[id]*pc_eta+metrics.zet_x[id]*pc_zet);
+        vFlow[id]=vFTmp[id]-dt*(metrics.xi_y[id]*pc_xi+metrics.eta_y[id]*pc_eta+metrics.zet_y[id]*pc_zet);
+        wFlow[id]=wFTmp[id]-dt*(metrics.xi_z[id]*pc_xi+metrics.eta_z[id]*pc_eta+metrics.zet_z[id]*pc_zet);
+    }
+    applyVelocityBC(uFlow, vFlow, wFlow);
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  可視化（x-r断面、φ=0面 k=0）
+// ════════════════════════════════════════════════════════════════════
+function getColor(value, minV, maxV, mode) {
+    let n=(value-minV)/(maxV-minV||1); n=Math.min(1,Math.max(0,n));
+    let r=0,g=0,b=0;
+    if (mode==='vel') {
+        if(n<0.125){r=0;g=0;b=180;}else if(n<0.250){r=80;g=80;b=255;}
+        else if(n<0.375){r=180;g=180;b=255;}else if(n<0.500){r=240;g=240;b=255;}
+        else if(n<0.625){r=255;g=240;b=240;}else if(n<0.750){r=255;g=180;b=180;}
+        else if(n<0.875){r=255;g=80;b=80;}else{r=180;g=0;b=0;}
+    } else if (mode==='prs') {
+        if(n<0.1111){r=0;g=0;b=220;}else if(n<0.2222){r=0;g=140;b=255;}
+        else if(n<0.3333){r=0;g=210;b=255;}else if(n<0.4444){r=0;g=200;b=150;}
+        else if(n<0.5555){r=0;g=160;b=70;}else if(n<0.6666){r=130;g=200;b=60;}
+        else if(n<0.7777){r=200;g=200;b=30;}else if(n<0.8888){r=240;g=120;b=20;}
+        else{r=240;g=10;b=10;}
+    } else {
+        if(n<0.100){r=100;g=0;b=200;}else if(n<0.250){r=0;g=100;b=255;}
+        else if(n<0.450){r=0;g=220;b=255;}else if(n<0.550){r=127;g=127;b=127;}
+        else if(n<0.750){r=240;g=230;b=0;}else if(n<0.900){r=255;g=110;b=0;}
+        else{r=255;g=0;b=0;}
+    }
+    return `rgba(${r},${g},${b},0.85)`;
+}
+
+// x-r平面 → canvas座標（横軸x、縦軸r）
+function toCanvas(x, r) { return { x: offsetX+x*scale, y: offsetY-r*scale }; }
+
+function renderGrid() {
+    if (!gX2d) return;
+    const vm=viewModeSelect.value;
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+
+    const k0    = 0;                          // φ=0断面
+    const kHalf = Math.floor((kmax - 1) / 2);  // φ=π断面（対極、実データ）
+
+    if (vm!=='meshOnly' && uFlow) {
+        for (let i=0; i<imax-1; i++) {
+            for (let j=0; j<jmax-1; j++) {
+                // 断面座標（半径成分の大きさ）はgX2d/gR2dから直接取得
+                const x00=gX2d[i*jmax+j],     r00=gR2d[i*jmax+j];
+                const x10=gX2d[(i+1)*jmax+j],  r10=gR2d[(i+1)*jmax+j];
+                const x11=gX2d[(i+1)*jmax+j+1],r11=gR2d[(i+1)*jmax+j+1];
+                const x01=gX2d[i*jmax+j+1],    r01=gR2d[i*jmax+j+1];
+
+                const mk = vm === 'velocity' ? 'vel' : vm === 'pressure' ? 'prs' : 'vrt';
+                const minV = vm === 'velocity' ? 0 : vm === 'pressure' ? -1.5 : -10;
+                const maxV = vm === 'velocity' ? U_inf * 2 : vm === 'pressure' ? 0.75 : 10;
+
+                // 上半面（φ=0, Y>0）と下半面（φ=π, Y<0）：それぞれの実データをそのまま描画
+                // （軸対称を仮定した鏡映ではなく、対極の方位角断面の実際の流れ場を表示する）
+                for (const [sgn, kk] of [[1, k0], [-1, kHalf]]) {
+                    const id00=idx(i,j,kk),   id10=idx(i+1,j,kk);
+                    const id11=idx(i+1,j+1,kk), id01=idx(i,j+1,kk);
+
+                    // この断面における符号付き座標（物理Y座標に相当）
+                    const Y00=sgn*r00, Y10=sgn*r10, Y11=sgn*r11, Y01=sgn*r01;
+
+                    let val=0;
+                    if (vm==='velocity') {
+                        const u=0.25*(uFlow[id00]+uFlow[id10]+uFlow[id11]+uFlow[id01]);
+                        const v=0.25*(vFlow[id00]+vFlow[id10]+vFlow[id11]+vFlow[id01]);
+                        const w=0.25*(wFlow[id00]+wFlow[id10]+wFlow[id11]+wFlow[id01]);
+                        val=Math.sqrt(u*u+v*v+w*w);
+                    } else if (vm==='pressure') {
+                        val=0.25*(pFlow[id00]+pFlow[id10]+pFlow[id11]+pFlow[id01]);
+                    } else {
+                        // ω_φ（x-Y断面上の渦度成分）をセル中心で直接計算
+                        const u00 = uFlow[id00], v00 = vFlow[id00];
+                        const u10 = uFlow[id10], v10 = vFlow[id10];
+                        const u11 = uFlow[id11], v11 = vFlow[id11];
+                        const u01 = uFlow[id01], v01 = vFlow[id01];
+
+                        // 1. セル中心における局所座標系(ξ, η)での幾何学的な偏微分 (Δξ=1, Δη=1)
+                        //    符号付きYを使うことで上下どちらの断面でも同一式で正しい向きが得られる
+                        const x_xi = 0.5 * ((x10 + x11) - (x00 + x01));
+                        const x_eta = 0.5 * ((x01 + x11) - (x00 + x10));
+                        const Y_xi = 0.5 * ((Y10 + Y11) - (Y00 + Y01));
+                        const Y_eta = 0.5 * ((Y01 + Y11) - (Y00 + Y10));
+
+                        // 2. 2次元ヤコビアン行列式
+                        const J2d = x_xi * Y_eta - x_eta * Y_xi;
+
+                        val = 0;
+                        if (Math.abs(J2d) > 1e-20) {
+                            // 3. 2次元の逆ヤコビ行列からメトリックを直接計算
+                            const xi_x = Y_eta / J2d;
+                            const eta_x = -Y_xi / J2d;
+                            const xi_Y = -x_eta / J2d;
+                            const eta_Y = x_xi / J2d;
+
+                            // 4. 計算空間(ξ, η)における速度の偏微分
+                            const u_xi = 0.5 * ((u10 + u11) - (u00 + u01));
+                            const u_eta = 0.5 * ((u01 + u11) - (u00 + u10));
+                            const v_xi = 0.5 * ((v10 + v11) - (v00 + v01));
+                            const v_eta = 0.5 * ((v01 + v11) - (v00 + v10));
+
+                            // 5. 連鎖律による物理空間(x, Y)での微係数
+                            const dv_dx = xi_x * v_xi + eta_x * v_eta;
+                            const du_dY = xi_Y * u_xi + eta_Y * u_eta;
+
+                            // 6. 渦度の算出
+                            val = dv_dx - du_dY;
+                        }
+                    }
+
+                    const color = getColor(val, minV, maxV, mk);
+                    const p00 = toCanvas(x00, Y00), p10 = toCanvas(x10, Y10);
+                    const p11 = toCanvas(x11, Y11), p01 = toCanvas(x01, Y01);
+                    ctx.fillStyle = color;
+                    ctx.beginPath(); ctx.moveTo(p00.x, p00.y); ctx.lineTo(p10.x, p10.y);
+                    ctx.lineTo(p11.x, p11.y); ctx.lineTo(p01.x, p01.y); ctx.closePath(); ctx.fill();
+                }
+            }
+        }
+    }
+
+    // 格子線（x-r断面）
+    ctx.strokeStyle=vm==='meshOnly'?'rgba(0,0,0,0.7)':'rgba(80,80,80,0.06)';
+    ctx.lineWidth=vm==='meshOnly'?0.8:0.4;
+    for (let i=0; i<imax; i++) {
+        for (const sgn of [1,-1]) {
+            ctx.beginPath();
+            for (let j=0; j<jmax; j++) { const pt=toCanvas(gX2d[i*jmax+j],sgn*gR2d[i*jmax+j]); j===0?ctx.moveTo(pt.x,pt.y):ctx.lineTo(pt.x,pt.y); }
+            ctx.stroke();
+        }
+    }
+    for (let j=0; j<jmax; j++) {
+        for (const sgn of [1,-1]) {
+            ctx.beginPath();
+            for (let i=0; i<imax; i++) { const pt=toCanvas(gX2d[i*jmax+j],sgn*gR2d[i*jmax+j]); i===0?ctx.moveTo(pt.x,pt.y):ctx.lineTo(pt.x,pt.y); }
+            ctx.stroke();
+        }
+    }
+
+    // ════════════════════════════════════════════════════════════════
+    // 球表面の格子線
+    // ════════════════════════════════════════════════════════════════
+
+
+    // 経線（j方向の弧、k=一定）: 全方位角格子点(kmax-1本)で密に描画
+    const NK_disp = kmax - 1;
+    for (let m=0; m<NK_disp; m++) {
+        const phi = 2.0*Math.PI*m/NK_disp;
+        const cosPhi = Math.cos(phi), sinPhi = Math.sin(phi);
+        let prevPt = null, prevFront = null;
+        for (let j=0; j<jmax; j++) {
+            const x0 = gX2d[0*jmax+j], r0 = gR2d[0*jmax+j];
+            const Yc = r0*cosPhi, Zc = r0*sinPhi;
+            const pt = toCanvas(x0, Yc);
+            const front = Zc >= -1e-9;
+            if (prevPt) {
+                ctx.strokeStyle = front ? 'rgba(0,0,0,0.7)' : 'rgba(0,0,0,0.0)';
+                ctx.lineWidth = 0.8;
+                if (front) {
+                    ctx.beginPath(); ctx.moveTo(prevPt.x, prevPt.y); ctx.lineTo(pt.x, pt.y); ctx.stroke();
+                }
+            }
+            prevPt = pt; prevFront = front;
+        }
+    }
+
+    // 緯線（k方向の円、i=0固定・各j格子点位置で方位角一周）: 全j格子点で密に描画
+    for (let j=1; j<jmax-1; j++) {
+        const x0 = gX2d[0*jmax+j], r0 = gR2d[0*jmax+j];
+        if (r0 < 1e-9) continue; // 軸上(r=0)は緯線なし
+        const segs = Math.max(32, NK_disp);
+        for (let s=0; s<segs; s++) {
+            const phi0 = 2.0*Math.PI*s/segs;
+            const phi1 = 2.0*Math.PI*(s+1)/segs;
+            const Y0=r0*Math.cos(phi0), Z0=r0*Math.sin(phi0);
+            const Y1=r0*Math.cos(phi1), Z1=r0*Math.sin(phi1);
+            const front = (Z0+Z1) >= 0;
+            if (!front) continue; // 裏側は描かない（手前面のみで網目表現）
+            ctx.strokeStyle = 'rgba(0,0,0,0.7)';
+            ctx.lineWidth = 0.8;
+            const p0=toCanvas(x0,Y0), p1=toCanvas(x0,Y1);
+            ctx.beginPath(); ctx.moveTo(p0.x,p0.y); ctx.lineTo(p1.x,p1.y); ctx.stroke();
+        }
+    }
+
+
+    // ステータスパネル
+    ctx.fillStyle="rgba(0,0,0,0.7)"; ctx.fillRect(15,15,160,115);
+    ctx.font="bold 12px 'Courier New',monospace";
+    ctx.fillStyle="#ffffff"; ctx.fillText(`Grid: ${imax-1}×${jmax-1}×${kmax-1}`,25,35);
+    ctx.fillStyle="#aaddff"; ctx.fillText(`Re: ${Re}`,25,55);
+    ctx.fillStyle=maxCflGlobal>1.0?"#ff4d4d":maxCflGlobal>0.5?"#ffcc00":"#00ff66";
+    ctx.fillText(`CFL: ${maxCflGlobal.toFixed(3)}`, 25,75);
+    ctx.fillStyle="#ffffff";
+    ctx.fillText(`t:  ${cfdTotalTime.toFixed(4)}`,25,95);
+    ctx.fillText(`dt: ${dt.toExponential(2)}`, 25,115);
+
+    // カラーバー
+    if (vm!=='meshOnly') {
+        const label=vm==='velocity'?'|u|':vm==='pressure'?'p':'ω_φ';
+        const bands=vm==='velocity'?[
+            [0,0.125,0,0,180],[0.125,0.25,80,80,255],[0.25,0.375,180,180,255],[0.375,0.5,240,240,255],
+            [0.5,0.625,255,240,240],[0.625,0.75,255,180,180],[0.75,0.875,255,80,80],[0.875,1,180,0,0]
+        ]:vm==='pressure'?[
+            [0,0.1111,0,0,220],[0.1111,0.2222,0,140,255],[0.2222,0.3333,0,210,255],[0.3333,0.4444,0,200,150],
+            [0.4444,0.5555,0,160,70],[0.5555,0.6666,130,200,60],[0.6666,0.7777,200,200,30],
+            [0.7777,0.8888,240,120,20],[0.8888,1,240,10,10]
+        ]:[
+            [0,0.1,100,0,200],[0.1,0.25,0,100,255],[0.25,0.45,0,220,255],
+            [0.45,0.55,127,127,127],[0.55,0.75,240,230,0],[0.75,0.9,255,110,0],[0.9,1,255,0,0]
+        ];
+        const cbH=Math.floor((canvas.height-48)/2), cbW=16, cbX=38, cbY=canvas.height-cbH-28;
+        ctx.save();
+        bands.forEach(([f,t,r,g,b])=>{
+            const y0=cbY+(1-t)*cbH, y1=cbY+(1-f)*cbH;
+            ctx.fillStyle=`rgb(${r},${g},${b})`; ctx.fillRect(cbX,y0,cbW,y1-y0+0.5);
+        });
+        ctx.strokeStyle='rgba(60,60,60,0.5)'; ctx.lineWidth=0.8; ctx.strokeRect(cbX,cbY,cbW,cbH);
+        ctx.font='bold 11px Arial'; ctx.fillStyle='#333'; ctx.textAlign='center';
+        ctx.fillText(label,cbX+cbW/2,cbY-7);
+        ctx.font='10px Arial'; ctx.textAlign='left';
+        const minV=vm==='velocity'?0:vm==='pressure'?-1.5:-10;
+        const maxV=vm==='velocity'?U_inf*2:vm==='pressure'?0.75:10;
+        const drawn=new Set();
+        bands.forEach(([f,t])=>{
+            [f,t].forEach(norm=>{
+                const key=norm.toFixed(4); if(drawn.has(key))return; drawn.add(key);
+                const py=cbY+(1-norm)*cbH;
+                const val=minV+norm*(maxV-minV);
+                ctx.strokeStyle='rgba(60,60,60,0.6)'; ctx.lineWidth=0.8;
+                ctx.beginPath(); ctx.moveTo(cbX+cbW,py); ctx.lineTo(cbX+cbW+4,py); ctx.stroke();
+                ctx.fillStyle = '#222'; ctx.fillText(parseFloat(val.toFixed(2)).toString(),cbX+cbW+6,py+3.5);
+            });
+        });
+        ctx.restore();
+    }
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  VTK エクスポート（STRUCTURED_GRID）
+// ════════════════════════════════════════════════════════════════════
+function exportVTK() {
+    if (!gX||!uFlow) { alert('Run simulation first.'); return; }
+    const lines=[];
+    lines.push('# vtk DataFile Version 3.0','Web CFD - Sphere','ASCII',
+               'DATASET STRUCTURED_GRID',`DIMENSIONS ${imax} ${jmax} ${kmax}`,`POINTS ${N3} float`);
+    for (let k=0;k<kmax;k++) for (let j=0;j<jmax;j++) for (let i=0;i<imax;i++) {
+        const id=idx(i,j,k); lines.push(`${gX[id].toFixed(6)} ${gY[id].toFixed(6)} ${gZ[id].toFixed(6)}`);
+    }
+    lines.push(`POINT_DATA ${N3}`,'SCALARS pressure float 1','LOOKUP_TABLE default');
+    for (let k=0;k<kmax;k++) for (let j=0;j<jmax;j++) for (let i=0;i<imax;i++) lines.push(pFlow[idx(i,j,k)].toFixed(6));
+    lines.push('VECTORS velocity float');
+    for (let k=0;k<kmax;k++) for (let j=0;j<jmax;j++) for (let i=0;i<imax;i++) {
+        const id=idx(i,j,k); lines.push(`${uFlow[id].toFixed(6)} ${vFlow[id].toFixed(6)} ${wFlow[id].toFixed(6)}`);
+    }
+    const blob=new Blob([lines.join('\n')],{type:'text/plain'});
+    const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+    a.download=`sphere_Re${Re}_t${cfdTotalTime.toFixed(3)}.vtk`; a.click();
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  初期化・ループ・イベント
+// ════════════════════════════════════════════════════════════════════
+function init() {
+    Re=Math.max(1,Math.min(1000000,parseFloat(reInput.value)||100));
+    generateGrid(); computeMetrics(); initCfdBuffers(); renderGrid();
+}
+
+function cfdLoop() {
+    if (!isCfdRunning) return;
+    for (let s=0;s<1;s++) stepFlowSolver();
+    renderGrid();
+    requestAnimationFrame(cfdLoop);
+}
+
+toggleCfdBtn.addEventListener('click',()=>{
+    isCfdRunning=!isCfdRunning;
+    if(isCfdRunning){toggleCfdBtn.innerText='Stop';toggleCfdBtn.style.background='#c0392b';cfdLoop();}
+    else{toggleCfdBtn.innerText='Start';toggleCfdBtn.style.background='#e67e22';}
+});
+resetCfdBtn.addEventListener('click',()=>{initCfdBuffers();renderGrid();});
+exportVtkBtn.addEventListener('click',exportVTK);
+viewModeSelect.addEventListener('change',renderGrid);
+reInput.addEventListener('change',()=>{init();});
+
+canvas.addEventListener('wheel',(e)=>{
+    e.preventDefault();
+    const rect=canvas.getBoundingClientRect(),mx=e.clientX-rect.left,my=e.clientY-rect.top;
+    const px=(mx-offsetX)/scale,pr=(offsetY-my)/scale;
+    scale=e.deltaY<0?Math.min(10000,scale*1.1):Math.max(10,scale/1.1);
+    offsetX=mx-px*scale; offsetY=my+pr*scale; renderGrid();
+});
+canvas.addEventListener('mousedown',(e)=>{isDragging=true;startX=e.clientX;startY=e.clientY;});
+canvas.addEventListener('mousemove',(e)=>{
+    if(!isDragging)return;
+    offsetX+=e.clientX-startX; offsetY+=e.clientY-startY;
+    startX=e.clientX; startY=e.clientY; renderGrid();
+});
+window.addEventListener('mouseup',()=>{isDragging=false;});
+
+init();
+</script>
+</body>
+</html>
