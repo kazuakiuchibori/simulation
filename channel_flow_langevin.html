@@ -221,18 +221,18 @@
             <div class="stat-card"><div class="stat-label">吸着効率 η = N_dead/(N_dead+N_exit)</div><div id="s-rate" class="stat-value">0%</div></div>
             <div class="stat-card"><div class="stat-label">経過時間 t</div><div id="s-time" class="stat-value">0.0 s</div></div>
             <div class="stat-card">
-                <div class="stat-label">物質伝達係数 km [m/s]</div>
+                <div class="stat-label">境膜物質伝達係数 km [m/s]</div>
                 <div id="out-km" class="stat-value accent">—</div>
             </div>
 
             <div class="stat-card">
-                <div class="stat-label">濃度比 Cwall/Cbulk = km/(km+v_w)</div>
+                <div class="stat-label">濃度比 Cwall/Cbulk = km/(km+ks)</div>
                 <div id="out-cw" class="stat-value accent">—</div>
             </div>
 
             <div class="stat-card">
-                <div class="stat-label">律速指標 km/v_w</div>
-                <div id="out-kmvw" class="stat-value accent">—</div>
+                <div class="stat-label">律速指標 km/ks</div>
+                <div id="out-kmks" class="stat-value accent">—</div>
             </div>
 
             <div class="stat-card">
@@ -266,13 +266,13 @@
             <div class="panel">
                 <div class="control-row">
                     <label for="sl-h">流路幅 H [m]</label>
-                    <input id="sl-h" type="range" min="0.005" max="0.100" step="0.005" value="0.010">
-                    <span id="v-h" class="v-val">0.010</span>
+                    <input id="sl-h" type="range" min="0.005" max="0.100" step="0.005" value="0.020">
+                    <span id="v-h" class="v-val">0.020</span>
                 </div>
                 <div class="control-row">
                     <label for="sl-q">バルク流速 U_bulk [m/s]</label>
-                    <input id="sl-q" type="range" min="0.10" max="10.0" step="0.05" value="1.00">
-                    <span id="v-q" class="v-val">1.00</span>
+                    <input id="sl-q" type="range" min="0.10" max="10.0" step="0.05" value="0.50">
+                    <span id="v-q" class="v-val">0.50</span>
                 </div>
                 <div class="control-row">
                     <label for="sl-gpu">膜性能 [GPU]</label>
@@ -326,15 +326,15 @@
                         <div id="out-sc" class="stat-value accent">—</div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-label">膜透過速度 v_w [m/s]</div>
-                        <div id="out-vw" class="stat-value accent">—</div>
+                        <div class="stat-label">膜面物質伝達係数 ks [m/s]</div>
+                        <div id="out-ks" class="stat-value accent">—</div>
                     </div>
                 </div>
                 <p style="font-size: 11px; color: var(--color-text-secondary); line-height: 1.4; margin: 0; text-align: left;">
                     ・ 層流/乱流境界層を背景流とするLangevin方程式により粒子を追跡し、粒子統計により各指標を算出します。<br>
                     ・ Re=2300 を閾値として、速度分布と管摩擦係数を層流(Poiseuille流れ)・乱流(対数則)に自動切替します。<br>
-                    ・ 透過膜前後の全圧差、膜透過度、濃度分圧から膜透過速度を自動算出します。<br>
-                    ・ 律速指標 km/v_wを定義することで、境界層律速(km/v_w &lt; 1)と透過膜律速(km/v_w &gt; 1)を判別します。<br>
+                    ・ 透過膜前後の全圧差、膜透過度、濃度分圧から膜面物質伝達係数 ks(Robin境界条件の一次反応速度定数)を自動算出します。<br>
+                    ・ 律速指標 km/ksを定義することで、境界層律速(km/ks &lt; 1)と透過膜律速(km/ks &gt; 1)を判別します。<br>
                     ・ 粒子統計により算出される各指標は、生存粒子が流出面に到達した時刻から更新され始めます。
                 </p>
             </div>
@@ -355,25 +355,6 @@
     </div>
 
     <script>
-        // ============================================================
-        // 全体構成
-        // ------------------------------------------------------------
-        // 本シミュレータは、平行平板間の流路流れ(層流/乱流)の中を運ばれる
-        // トレーサー粒子をLangevin方程式で追跡し、片側の壁が半透過膜
-        // (Robin境界条件 J = v_w * C)として粒子を確率的に吸着することで、
-        // ・吸着効率 η
-        // ・壁面物質移動係数 km, Sherwood数 Sh
-        // ・境界層律速/膜律速の判定 (km/v_w)
-        // を統計的に算出する。
-        //
-        // 粒子1個は「濃度の単位パケット」を表す。粒子密度分布そのものが
-        // 濃度場 C(x,y) の実現値になっている点がこのモデルの肝で、
-        // 各粒子の吸着確率 P_absorb は濃度に依存しない材料定数(v_w)だけで
-        // 決まる。濃度の効果は「壁近傍にいる粒子の数」という形で自然に
-        // 統計へ反映されるべきで、P_absorb 自体に濃度を混ぜ込むと二重計上
-        // になる(過去の修正でco2pct・patmをv_wから除去したのはこのため)。
-        // ============================================================
-
         const cv = document.getElementById('cv');
         const ctx = cv.getContext('2d');
 
@@ -381,14 +362,6 @@
         const MX = 80, MY = 35, MB = 45;
         const PW = CW - MX - 40, PH = CH - MY - MB;
 
-        // nu    : 動粘性係数 [m^2/s]（空気, 常温相当で固定値）
-        // kappa : von Kármán定数（対数則乱流速度分布に使用）
-        // domLen: 流路の流下方向の計算長さ [m]（この位置(x=domLen)に到達した
-        //         粒子は「流出」として扱う）
-        // yMin  : 壁からの距離の対数ビニングにおける下限値 [m]
-        //         (y=0ちょうどはlogが発散するため、統計・描画上の便宜的な下限)
-        // TL_scale, xSteadyMin: 乱流拡散のLagrangian時間スケール補正係数、
-        //         および定常統計を取り始めるx位置(現状0=流入直後から)
         const nu = 1.5e-5, kappa = 0.41;
         const domLen = 1.0;
         const yMin = 1e-5;
@@ -396,84 +369,64 @@
         const TL_scale = 0.20;
         const xSteadyMin = 0.0 * domLen;
 
-        // getP(): UIスライダーの現在値から、1ステップ分の物理パラメータ一式を
-        // まとめて返すヘルパー。step()や描画関数から毎フレーム呼ばれる。
         function getP() {
-            const H = +document.getElementById('sl-h').value;        // 流路幅 [m]（上下壁間距離）
-            const Ubulk = +document.getElementById('sl-q').value;    // バルク平均流速 [m/s]
-            const gpu = +document.getElementById('sl-gpu').value;    // 膜性能 [GPU]（1 GPU = 3.35e-10 mol/(m^2・s・Pa)）
-            const patm = +document.getElementById('sl-patm').value;  // 膜前後の全圧差 [atm]（現状は表示用のみ。下記参照）
+            const H = +document.getElementById('sl-h').value;
+            const Ubulk = +document.getElementById('sl-q').value;
+            const gpu = +document.getElementById('sl-gpu').value;
+            const patm = +document.getElementById('sl-patm').value;
 
-            // 膜透過速度 v_w [m/s]：Flux = v_w * C という定義から、
-            //   v_w = Flux/C = Permeance × R × T
-            // となり、駆動圧力差ΔP(=patm)は流束側と濃度側の両方に同じ形で
-            // 現れるため厳密にキャンセルする。したがって v_w は「膜の物性
-            // (透過度)と温度だけで決まる濃度非依存の物質移動速度」であり、
-            // patm・CO2濃度(co2pct)を掛けてはならない。
-            // 【修正3】ΔP(=patm)は分子(Flux)・分母(C)で厳密にキャンセルするため、
-            // v_w の式に patm を含めない。
-            const vw = gpu * 3.35e-10 * 8.314 * 298;
+            // 【修正3】ks(膜面物質伝達係数) = Flux/C の定義上、ΔP(=patm)は分子(Flux)・分母(C)で
+            // 厳密にキャンセルするため、ks の式に patm を含めてはならない。
+            // ks は膜物性(GPU)と温度のみで決まる純粋な物質移動係数であり、
+            // Robin境界条件 -D∂C/∂n|wall = ks・C_wall の一次反応速度定数に対応する。
+            // (境膜側の物質伝達係数 km とは起源が異なる独立パラメータ)
+            const ks = gpu * 3.35e-10 * 8.314 * 298;
 
-            const Dm = +document.getElementById('sl-dm').value * 1e-6; // 分子拡散係数 [m^2/s]
-            const nInf = +document.getElementById('sl-inf').value;     // 1ステップあたりの流入粒子数
+            const Dm = +document.getElementById('sl-dm').value * 1e-6;
+            const nInf = +document.getElementById('sl-inf').value;
 
-            const delta = H / 2.0;                    // 流路半幅 [m]（吸着壁からチャネル中心までの距離）
-            const Re = (Ubulk * 2.0 * H) / nu;         // Reynolds数 Re = 2*Ubulk*H/nu（水力直径基準）
+            const delta = H / 2.0;
+            const Re = (Ubulk * 2.0 * H) / nu;
 
-            // Darcy摩擦係数 f：層流はHagen-Poiseuille解(f=96/Re)、
-            // 乱流はBlasius近似(f=0.3164*Re^-0.25)で近似し、Re=2300で自動切替。
             let f;
             if (Re < 2300) {
                 f = 96.0 / Math.max(Re, 1);
             } else {
                 f = 0.3164 * Math.pow(Math.max(Re, 1), -0.25);
             }
-            const ustar = Ubulk * Math.sqrt(f / 8.0);  // 摩擦速度 u* [m/s]（乱流の速度・拡散スケールの基準）
+            const ustar = Ubulk * Math.sqrt(f / 8.0);
 
-            return { H, Ubulk, vw, Dm, nInf, delta, Re, f, ustar, patm };
+            return { H, Ubulk, ks, Dm, nInf, delta, Re, f, ustar, patm };
         }
 
-        // Umean(y,p): 壁からの距離yにおける時間平均流速 U(y) [m/s]
-        //   Re<2300 (層流): Hagen-Poiseuille放物線分布
-        //   Re>=2300(乱流): 壁法則(粘性底層/バッファ層/対数則の3区間)+ wake関数
-        //                   による中心速度の補正
         function Umean(y, p) {
             if (p.Re < 2300) {
                 const y_norm = Math.max(y, 0) / p.delta;
-                const eta = 1.0 - y_norm;                       // eta=1@壁, 0@中心
-                return 1.5 * p.Ubulk * (1.0 - eta * eta);        // 放物線分布（最大流速=1.5*Ubulk）
+                const eta = 1.0 - y_norm;
+                return 1.5 * p.Ubulk * (1.0 - eta * eta);
             } else {
-                const yp = p.ustar * Math.max(y, 1e-12) / nu;    // 壁座標 y+ = y*u*/nu
+                const yp = p.ustar * Math.max(y, 1e-12) / nu;
                 let u;
-                if (yp < 5) u = p.ustar * yp;                              // 粘性底層: u+ = y+
-                else if (yp < 30) u = p.ustar * (5 * Math.log(yp) - 3.05); // バッファ層（対数則への橋渡し近似）
-                else u = (p.ustar / kappa) * Math.log(yp) + 5.0 * p.ustar; // 対数則: u+ = (1/kappa)ln(y+) + B
+                if (yp < 5) u = p.ustar * yp;
+                else if (yp < 30) u = p.ustar * (5 * Math.log(yp) - 3.05);
+                else u = (p.ustar / kappa) * Math.log(yp) + 5.0 * p.ustar;
 
-                // wake項: チャネル中心に向けて速度を持ち上げ、中心線での勾配ゼロを近似的に満たす
                 const wake = (u * 0.15) * (1 - Math.cos(Math.PI * Math.min(y / p.delta, 1)));
                 return Math.max(0, u + wake);
             }
         }
 
-        // getSigmaV(y,ustar,delta): 壁直交方向(y方向)の速度変動の標準偏差 sigma_v [m/s]
-        //   壁近傍でゼロに減衰(no-slip・壁ブロッキング効果の簡易モデル)し、
-        //   チャネル中心に向けて指数関数的に減衰する。乱流拡散(乱流粘性の
-        //   ランダムウォーク版)の強さを決める。
         function getSigmaV(y, ustar, delta) {
             const yp = ustar * Math.max(y, 1e-12) / nu;
             return 1.1 * ustar * Math.pow(1 - Math.exp(-yp / 20), 2) * Math.exp(-y / (0.8 * delta));
         }
 
-        // getTL(y,ustar,delta): 乱流のLagrangian積分時間スケール T_L(y) [s]
-        //   壁近傍のスケール(粘性起源)と外層のスケール(kappa*y/u*起源)の和。
-        //   Langevin方程式(Ornstein-Uhlenbeck過程)の緩和時間として使う。
         function getTL(y, ustar, delta) {
             const t_wall = 10 * nu / (ustar * ustar);
             const t_outer = (kappa * Math.max(y, 1e-12) / ustar) * (1 - Math.exp(-y / delta));
             return TL_scale * (t_wall + t_outer);
         }
 
-        // randn(): 標準正規分布 N(0,1) の乱数（Box-Muller法）
         function randn() {
             let u = 0, v = 0;
             while (!u) u = Math.random();
@@ -481,74 +434,47 @@
             return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
         }
 
-        // --- 粒子・統計の状態変数 -----------------------------------------
         let parts = [], dead = [], totalDead = 0, totalSpawned = 0, totalExit = 0, simTime = 0;
-        // exitConcAccum, deadFluxAccum: 定常統計期間中の「流出」「吸着」の
-        //   純粋な個数カウント（流速などを掛けない。二重計上を避けるため）
         let exitConcAccum = 0.0;
         let deadFluxAccum = 0.0;
 
-        // isSteady: 最初の1粒子が流出面(x=domLen)に到達した時点でtrueになる。
-        //   それ以前は流入直後の過渡状態のため統計から除外し、以降のみを
-        //   定常状態の統計(km, Sh, η等の算出)に使う。
+        // 定常判定と専用の統計変数
         let isSteady = false;
-        let statDead = 0;   // 定常統計期間中に吸着された粒子数
-        let statExit = 0;   // 定常統計期間中に流出した粒子数
-        let statSimTime = 0.0; // 定常統計期間の経過時間 [s]
+        let statDead = 0;
+        let statExit = 0;
+        let statSimTime = 0.0;
 
-        // 壁からの距離yを対数スケールでNY_CONC分割し、各ビンの滞在粒子数を
-        // 蓄積することで濃度プロファイル C(y) を推定する。
         const NY_CONC = 240;
-        let concBins = new Float64Array(NY_CONC);     // 直近1フレームのビン別粒子数
-        let concAvgBins = new Float64Array(NY_CONC);  // 定常状態以降の時間平均用の累積
-        let concSamples = 0;                          // 平均に使ったフレーム数（50フレーム以上で統計を確定）
+        let concBins = new Float64Array(NY_CONC);
+        let concAvgBins = new Float64Array(NY_CONC);
+        let concSamples = 0;
         let wallConcRatio = 1.0, bulkConcValue = 1.0, kmValue = 0.0, shValue = 0.0, deltaC = 0.0;
 
-        // hmap: 平均粒子密度表示（ヒートマップ）用のバッファ（指数移動平均）
         const HW = 120, HH = 60;
         let hmap = new Float32Array(HW * HH);
         let showMap = false, running = false, rafId = null;
 
-        // computeDt(p): 陽解法の安定性・精度を確保するための時間刻み計算。
-        //   dt      : 通常領域(壁から十分離れた場所)で使うメインの時間刻み。
-        //             Lagrangian時間スケールTL・移流時間スケールの両方より
-        //             十分小さく取る(拡散項・OU過程の数値安定性のため)。
-        //   subCutoff, dtSub, subDiv:
-        //             壁極近傍(y<subCutoff)は吸着確率P_absorbや拡散が
-        //             短い時間スケールで効くため、dtをさらに細かい
-        //             サブステップ(dtSub)に分割して精度を上げる。
-        //             分割数subDivは拡散時間・吸着時間の両方から決める。
         function computeDt(p) {
-            const { Ubulk, Dm, vw, ustar, delta, Re } = p;
+            const { Ubulk, Dm, ks, ustar, delta, Re } = p;
 
-            // subCutoff: 「壁近傍サブステップ領域」の厚さ。粘性底層厚さの目安
-            //   (乱流: 50*nu/u*, 層流: delta/50)とdeltaの10%の小さい方。
             const yViscous = Re >= 2300 ? 50.0 * nu / ustar : delta / 50.0;
             const subCutoff = Math.min(yViscous, 0.10 * delta);
 
-            // dt: OU過程(速度のLangevin方程式)の緩和時間TLの1/4、
-            //     半チャネル長を横切る移流時間の半分、上限0.05sの最小値
             const TL_min = TL_scale * 10.0 * nu / (ustar * ustar);
             const dt_TL = 0.25 * TL_min;
             const dt_adv = 0.5 * domLen / Math.max(Ubulk, 1e-9);
             const dt = Math.max(1e-5, Math.min(dt_TL, dt_adv, 0.05));
 
-            // dt_diff: 拡散がsubCutoffの厚みを"飛び越えない"ための時間刻み上限
-            // dt_abs : 吸着確率P_absorbの指数がO(1)を超えない(=1ステップで
-            //          ほぼ確実に吸着/反射が決着する)ための時間刻み上限
             const dt_diff = 0.25 * subCutoff * subCutoff / (2.0 * Math.max(Dm, 1e-12));
-            const dt_abs = vw > 1e-12 ? 2.0 * Dm / vw : dt_diff;
+            const dt_abs = ks > 1e-12 ? 2.0 * Dm / ks : dt_diff;
             const dtSub_target = Math.min(dt_diff, dt_abs, dt_TL);
 
-            // subDiv: dtをdtSub_target以下のサブステップに割るための分割数(10〜1000にクランプ)
             const subDiv = Math.max(10, Math.min(1000, Math.ceil(dt / Math.max(dtSub_target, 1e-9))));
             const dtSub = dt / subDiv;
 
             return { dt, subDiv, dtSub, subCutoff };
         }
 
-        // resetAll(): 粒子・統計・ヒートマップ・spawn分布キャッシュを
-        //   すべて初期状態に戻す（「リセット」ボタンから呼ばれる）。
         function resetAll() {
             parts = []; dead = []; totalDead = 0; totalSpawned = 0; totalExit = 0; simTime = 0;
             exitConcAccum = 0.0; deadFluxAccum = 0.0;
@@ -565,19 +491,10 @@
             updateDisplays(); redraw();
         }
 
-        // 流入境界(x=0)での粒子のy位置サンプリング用CDFキャッシュ。
-        // 流速分布(Re, Ubulk, ustar, delta)が変わらない限り再構築しない。
         const N_CDF = 2000;
         let spawnCDF = null;
         let spawnCDF_key = '';
 
-        // buildSpawnCDF(p): 流入粒子のy方向分布を「流量重み付き」で作る。
-        //   pdf(y) ∝ U(y)（一様濃度のバルク流入を仮定した場合の体積流量密度）
-        //   これにより、粒子密度分布が流量で正しく重み付けされた
-        //   「一様濃度が流入する」条件を再現できる（速度が速い場所ほど
-        //   単位時間に運ばれてくる物質量が多いため、そこに多く粒子を撒く）。
-        //   y軸を対数格子にしているのは、壁近傍(薄い濃度・速度境界層)を
-        //   細かく分解するため。
         function buildSpawnCDF(p) {
             const key = `${p.Re.toFixed(0)}_${p.Ubulk.toFixed(6)}_${p.ustar.toFixed(8)}_${p.delta.toFixed(6)}`;
             if (spawnCDF && spawnCDF_key === key) return spawnCDF;
@@ -589,7 +506,7 @@
             for (let i = 0; i < N_CDF; i++) {
                 const t = (i + 0.5) / N_CDF;
                 ys[i] = Math.exp(log_ymin + t * (log_ymax - log_ymin));
-                pdf[i] = Math.max(Umean(ys[i], p), 0) * ys[i]; // 対数格子のヤコビアン(dy=y*dlny)を補正
+                pdf[i] = Math.max(Umean(ys[i], p), 0) * ys[i];
             }
 
             const cdf = new Float64Array(N_CDF);
@@ -603,7 +520,6 @@
             return spawnCDF;
         }
 
-        // sampleY(cdf_obj): 逆関数法(二分探索)によりCDFからyをサンプリング
         function sampleY(cdf_obj) {
             const { ys, cdf } = cdf_obj;
             const u = Math.random();
@@ -617,9 +533,6 @@
             return ys[lo - 1] + t * (ys[lo] - ys[lo - 1]);
         }
 
-        // spawn(n): x=0の流入面にn個の粒子を新規生成する。
-        //   初期速度は局所平均流速Umean(y)を中心に、乱流の場合は
-        //   getSigmaVで決まる速度変動を加えた乱数で与える（層流はゆらぎ無し）。
         function spawn(n) {
             const p = getP();
             const cdf_obj = buildSpawnCDF(p);
@@ -637,43 +550,31 @@
             }
         }
 
-        // step(): 全粒子を1メインステップ(dt)進める。壁極近傍(y<subCutoff)の
-        //   粒子だけは吸着確率・拡散の精度を確保するためdtSub刻みで
-        //   subDiv回のサブステップに分けて計算する。
         function step() {
             const p = getP();
-            const { ustar, delta, Dm, vw, Re } = p;
+            const { ustar, delta, Dm, ks, Re } = p;
             const keep = [];
 
             const { dt, subDiv, dtSub, subCutoff } = computeDt(p);
             const sdtSub = Math.sqrt(dtSub);
             const sdtMain = Math.sqrt(dt);
-            const dy_diff = 1e-6; // sigma_v^2の数値微分に使う差分幅
+            const dy_diff = 1e-6;
 
             for (let i = 0; i < parts.length; i++) {
                 let pt = parts[i];
                 let isDead = false;
 
                 if (pt.y >= subCutoff) {
-                    // --- 壁から十分離れた領域: dt刻みで直接更新 ---
                     if (Re < 2300) {
-                        // 層流: 乱流揺らぎなし。移流は局所平均流速そのもの、
-                        //       拡散は分子拡散 sqrt(2*Dm*dt) のみ
                         pt.vx = Umean(pt.y, p);
                         pt.vy = 0;
                         pt.x += pt.vx * dt + Math.sqrt(2 * Dm) * randn() * sdtMain;
                         pt.y += pt.vy * dt + Math.sqrt(2 * Dm) * randn() * sdtMain;
                     } else {
-                        // 乱流: (vx,vy)をOrnstein-Uhlenbeck型Langevin方程式で更新。
-                        //   平均への回帰項 -(v-U)/TL_y、揺らぎ項 sigma*sqrt(2/TL_y)*dW
-                        //   により、速度自己相関がexp(-t/TL_y)となる乱流モデル。
                         const Um = Umean(pt.y, p);
                         const sig_c = getSigmaV(pt.y, ustar, delta);
                         const TL_y = getTL(pt.y, ustar, delta);
 
-                        // dSig2_dy: sigma_v^2(y)のy方向勾配（中心差分）。
-                        //   不均一乱流拡散場での「見かけの粒子集積」を防ぐための
-                        //   Thompsonのdrift補正項(well-mixed条件を満たすために必要)。
                         const sig_p = getSigmaV(pt.y + dy_diff, ustar, delta);
                         const y_m = Math.max(1e-12, pt.y - dy_diff);
                         const sig_m = getSigmaV(y_m, ustar, delta);
@@ -687,21 +588,14 @@
                         pt.vx += (-(pt.vx - Um) / TL_y) * dt + sig_u * Math.sqrt(2 / TL_y) * randn() * sdtMain;
                         pt.vy += (-pt.vy / TL_y) * dt + drift * dt + sig_c * Math.sqrt(2 / TL_y) * randn() * sdtMain;
 
-                        // 位置は速度を積分＋分子拡散(サブグリッドスケール)を追加
                         pt.x += pt.vx * dt + Math.sqrt(2 * Dm) * randn() * sdtMain;
                         pt.y += pt.vy * dt + Math.sqrt(2 * Dm) * randn() * sdtMain;
                     }
                     if (pt.y <= 0) {
-                        // 壁を貫通した(=壁に到達した)ので吸着判定を行う
                         const penetration = Math.max(-pt.y, 1e-12);
-                        // Erban-Chapman型の部分吸収境界条件: Robin BC
-                        //   -D*dC/dy = v_w*C を満たすように、壁貫通深さ
-                        //   penetrationに応じた吸着確率を与える。
-                        //   v_wは濃度非依存の物質移動速度(材料定数)であり、
-                        //   濃度依存性は「壁近傍の粒子密度」から自然に生じる。
-                        const P_absorb = 1.0 - Math.exp(-vw * penetration / Dm);
+                        // Robin境界条件 -D∂C/∂n = ks・C_wall の粒子法離散化(部分吸収確率)
+                        const P_absorb = 1.0 - Math.exp(-ks * penetration / Dm);
                         if (Math.random() < P_absorb) {
-                            // 吸着: 粒子を消滅させ、定常統計期間中ならカウント
                             dead.push({ x: Math.max(0, Math.min(pt.x, domLen)) });
                             totalDead++;
                             if (isSteady && pt.x >= xSteadyMin) {
@@ -710,15 +604,12 @@
                             }
                             isDead = true;
                         } else {
-                            // 反射: 壁を鏡映して跳ね返す(y,vyの符号反転)
                             pt.y = -pt.y;
                             pt.vy = -pt.vy;
                         }
                     }
                 }
                 else {
-                    // --- 壁極近傍領域: dtSub刻みでsubDiv回のサブステップ ---
-                    //     (基本ロジックは上のメイン領域と同一。刻み幅のみ細かい)
                     for (let step = 0; step < subDiv; step++) {
                         if (Re < 2300) {
                             pt.vx = Umean(pt.y, p);
@@ -755,7 +646,8 @@
 
                         if (pt.y <= 0) {
                             const penetration = Math.max(-pt.y, 1e-12);
-                            const P_absorb = 1.0 - Math.exp(-vw * penetration / Dm);
+                            // Robin境界条件 -D∂C/∂n = ks・C_wall の粒子法離散化(部分吸収確率)
+                            const P_absorb = 1.0 - Math.exp(-ks * penetration / Dm);
                             if (Math.random() < P_absorb) {
                                 dead.push({ x: Math.max(0, Math.min(pt.x, domLen)) });
                                 totalDead++;
@@ -775,10 +667,6 @@
 
                 if (isDead) continue;
                 if (pt.x > domLen) {
-                    // 流出面(x=domLen)に到達した粒子。
-                    // 初めて流出した瞬間に「定常状態に入った」とみなし、
-                    // それまでの過渡的な統計(流入直後の初期分布の偏り)を
-                    // 全て破棄してカウンタをリセットする。
                     if (!isSteady) {
                         isSteady = true;
                         concAvgBins.fill(0);
@@ -794,18 +682,15 @@
                         statExit++;
                         exitConcAccum += 1.0; // 【修正1】流速二重掛けの解消（純粋個数カウント）
                     }
-                    continue; // この粒子はkeepに入れない(=消滅、流出として扱う)
+                    continue;
                 }
 
-                // チャネル中心(y=delta)を越えたら鏡映反射（中心線は対称境界）
                 if (pt.y > delta) {
                     pt.y = 2 * delta - pt.y;
                     pt.vy = -pt.vy;
                     if (pt.y > delta) pt.y = delta;
                 }
 
-                // 平均粒子密度表示(ヒートマップ)用に、(x,y)を対数y×線形xの
-                // グリッドへビニングして加算する（物理計算には影響しない）
                 if (pt.y >= yMin) {
                     const hxi = Math.min(HW - 1, Math.floor(Math.min(pt.x, domLen - 1e-9) / domLen * HW));
                     const ly_curr = Math.log(pt.y);
@@ -815,22 +700,19 @@
                     const hyi = Math.floor(ratio * HH);
                     hmap[(HH - 1 - hyi) * HW + hxi] += 0.03;
                 }
-                keep.push(pt); // 生存粒子として残す
+                keep.push(pt);
             }
             parts = keep;
-            for (let k = 0; k < hmap.length; k++) hmap[k] *= 0.998; // ヒートマップを緩やかに減衰(時間平均風の表示)
+            for (let k = 0; k < hmap.length; k++) hmap[k] *= 0.998;
 
             updateConcentrationStatistics();
             simTime += dt;
             if (isSteady) statSimTime += dt;
-            if (dead.length > 2000) dead.splice(0, dead.length - 2000); // 描画用吸着点リストの上限（メモリ対策）
+            if (dead.length > 2000) dead.splice(0, dead.length - 2000);
         }
 
-        // toSX(x): 物理x座標[m](0〜domLen) → canvas上のピクセルX座標
         function toSX(x) { return MX + (x / domLen) * PW; }
 
-        // toSY(y,delta): 壁からの距離y[m](対数スケール, yMin〜delta) → canvas上のピクセルY座標
-        //   (壁=canvas下端、チャネル中心=canvas上端付近になるよう対数変換)
         function toSY(y, delta) {
             const log_ymin = Math.log(yMin);
             const log_ymax = Math.log(delta);
@@ -839,7 +721,6 @@
             return MY + PH - ratio * PH;
         }
 
-        // drawProf(p): 平均流速分布 U(y) を緑の曲線として描画
         function drawProf(p) {
             ctx.strokeStyle = '#5aad7a'; ctx.lineWidth = 2.5;
             const maxU = Umean(p.delta, p) * 1.2 || 1;
@@ -855,8 +736,6 @@
             ctx.stroke();
         }
 
-        // drawConcentrationProfile(delta): 時間平均濃度プロファイル C(y)/C_bulk を
-        //   赤の曲線として描画(横軸=無次元濃度比、縦軸=壁からの距離)
         function drawConcentrationProfile(delta) {
             if (concSamples < 50) return;
 
@@ -889,9 +768,6 @@
             ctx.stroke();
         }
 
-        // redraw(): canvas全体を1フレーム分再描画する
-        //   (背景グリッド → 密度ヒートマップ/粒子点 → 流速・濃度プロファイル
-        //    → 濃度境界層δc・粘性底層yvの補助線、の順にレイヤー合成)
         function redraw() {
             const p = getP();
             const { delta } = p;
@@ -1045,9 +921,6 @@
             }
         }
 
-        // updateConcentrationStatistics(): 濃度プロファイルC(y)・バルク濃度・
-        //   物質移動係数km・Sherwood数などを、蓄積された粒子統計から算出する。
-        //   毎ステップ(step()の最後)から呼ばれる。
         function updateConcentrationStatistics() {
             const p = getP();
             concBins.fill(0);
@@ -1056,9 +929,6 @@
             const log_ymax_c = Math.log(p.delta);
             const dly = (log_ymax_c - log_ymin_c) / NY_CONC;
 
-            // 現フレームの粒子を対数y方向のビンに数え上げる
-            // (x >= xSteadyMin の下流区間のみを対象とし、流入直後の
-            //  過渡的な分布を除外する)
             for (let i = 0; i < parts.length; i++) {
                 if (parts[i].x < xSteadyMin) continue;
                 const y = parts[i].y;
@@ -1069,17 +939,14 @@
                 concBins[j]++;
             }
 
-            if (!isSteady) return; // 定常状態に入るまでは統計を確定させない
+            if (!isSteady) return;
 
             for (let j = 0; j < NY_CONC; j++) {
                 concAvgBins[j] += concBins[j];
             }
             concSamples++;
-            if (concSamples < 50) return; // 十分なフレーム数が貯まるまで待つ(ノイズ低減)
+            if (concSamples < 50) return;
 
-            // C_array[j]: ビンjの時間平均濃度 [個数/m^2]
-            //   = (時間平均粒子数) / (ビンの断面積 dy * subLength)
-            //   ※ 2次元モデルなので「体積」ではなく「面積」で割ることに注意
             let C_array = new Float64Array(NY_CONC);
             const subLength = domLen - xSteadyMin;
             for (let j = 0; j < NY_CONC; j++) {
@@ -1089,10 +956,6 @@
                 C_array[j] = (concAvgBins[j] / concSamples) / Math.max(dy * subLength, 1e-12);
             }
 
-            // bulkConcValue: 流量重み付き平均濃度(混合カップ濃度) [個数/m^2]
-            //   C_bulk = ∫U(y)C(y)dy / ∫U(y)dy
-            //   単純な断面平均ではなく流量平均を使うのは、実際に配管を流れる
-            //   物質の「代表濃度」として工学的に意味があるため(質量収支と整合)。
             let bulkNumer = 0, bulkDenom = 0;
             for (let j = 0; j < NY_CONC; j++) {
                 const y_j = Math.exp(log_ymin_c + (j + 0.5) * dly);
@@ -1110,59 +973,40 @@
             if (bulkConcValue < 1e-12) bulkConcValue = 1e-12;
 
             // 【修正1】流速二重掛けを完全に排した、純粋な個数ベースでの除去効率 η の算出
-            // (このeta_fluxは現状どのDOM要素にも表示していない中間量。
-            //  画面表示のη(s-rate)はupdateDisplays()でstatDead/(statDead+statExit)
-            //  から直接計算しており、意味は同じ)
             const fluxTotal = deadFluxAccum + exitConcAccum;
             let eta_flux = 0;
             if (fluxTotal > 1e-12) {
                 eta_flux = Math.min(deadFluxAccum / fluxTotal, 0.9999);
             }
 
-            // Jw: 壁面での吸着個数フラックス [個数/(m・s)]
-            //   = 定常統計期間中の吸着数 / (統計時間 * 統計対象の壁面長さ)
-            //   (2次元モデルなので「単位奥行きあたりの壁面長さ」で規格化)
             const Jw =
                 statDead /
                 Math.max(statSimTime * subLength, 1e-12);
 
-            // Cw: 壁面濃度 [個数/m^2]。Robin境界条件の定義 Jw = v_w * Cw を
-            //   Cwについて解いたもの。v_wが濃度非依存の物質移動速度である
-            //   ことが、この式を意味あるものにするための前提条件。
+            // 壁面濃度 (Robin条件: Jw = ks・Cw より Cw = Jw/ks)
             const Cw =
-                p.vw > 1e-20
-                    ? Jw / p.vw
+                p.ks > 1e-20
+                    ? Jw / p.ks
                     : bulkConcValue;
 
-            // dC: バルク-壁面間の濃度差(物質移動の駆動力) [個数/m^2]
+            // 物質伝達係数
             const dC = Math.max(
                 bulkConcValue - Cw,
                 1e-20
             );
 
-            // km: 境界層側の物質移動係数 [m/s]。定義 Jw = km * dC より km = Jw/dC。
-            //   流動場(Re, Sc数, 幾何形状)のみで決まるべき量で、
-            //   膜の物性(v_w)や濃度そのものには依存しないのが物理的に正しい。
             kmValue = Jw / dC;
-            // Sh: Sherwood数 = km*H/Dm（無次元の物質移動係数。Nu数の物質移動版）
             shValue = kmValue * p.H / p.Dm;
 
-            // wallConcRatio = Cw/Cb の解析解: 直列抵抗モデル
-            //   (1/km: 境界層抵抗) + (1/v_w: 膜抵抗) の抵抗比から
-            //   Cw/Cb = km/(km+v_w) となる。km,v_wどちらも[m/s]の
-            //   物質移動速度(コンダクタンス)であることに注意。
-            //   v_w→0(膜が事実上不透過)ならCw→Cb(壁面で枯渇しない)、
-            //   km→0(境界層側が極端に遅い)ならCw→0(壁面ですぐ枯渇)。
-            if (kmValue > 0 && p.vw > 0) {
-                wallConcRatio = kmValue / (kmValue + p.vw);
-            } else if (p.vw <= 0) {
+            // 表示用 (解析解: km/(km+ks))
+            if (kmValue > 0 && p.ks > 0) {
+                wallConcRatio = kmValue / (kmValue + p.ks);
+            } else if (p.ks <= 0) {
                 wallConcRatio = 1.0;
             } else {
                 wallConcRatio = 0.0;
             }
 
-            // deltaC: 濃度境界層厚さ。壁から中心方向に見て、濃度が
-            //   バルク値の99%に初めて達する位置として定義(工学的な目安)。
             deltaC = p.delta;
             for (let j = NY_CONC - 1; j >= 0; j--) {
                 const C = C_array[j] / bulkConcValue;
@@ -1173,72 +1017,54 @@
             }
         }
 
-        // updateDisplays(): 現在のパラメータ・統計量をDOMのstat-cardへ反映する。
-        //   毎フレーム(loop内)およびスライダー操作時に呼ばれる。
         function updateDisplays() {
             const p = getP();
 
-            // --- 入力条件の表示欄(スライダー横の数値ラベル) ---
             document.getElementById('sl-h').value = p.H;
             document.getElementById('v-h').textContent = p.H.toFixed(3);
             document.getElementById('v-q').textContent = p.Ubulk.toFixed(2);
             document.getElementById('v-gpu').textContent = (+document.getElementById('sl-gpu').value).toLocaleString();
-            // 【修正2/3で解説した通り】CO2濃度スライダーは現状どの物理計算にも
-            // 使われておらず、表示のみの項目(将来、絶対流束などを再導入する
-            // 場合の入力候補として残してある)
             document.getElementById('v-co2').textContent = (+document.getElementById('sl-co2').value).toFixed(1);
             document.getElementById('v-patm').textContent = p.patm.toFixed(1);
             document.getElementById('v-dm').textContent = (p.Dm * 1e6).toFixed(0);
             document.getElementById('v-inf').textContent = p.nInf;
 
-            // --- 粒子統計(生存数・累計吸着数・吸着効率・経過時間) ---
             document.getElementById('s-alive').textContent = parts.length;
             document.getElementById('s-dead').textContent = totalDead;
 
-            // η = statDead/(statDead+statExit): 定常状態以降の
-            //   「吸着で消えた粒子数」と「流出した粒子数」の比。
-            //   流速などを掛けない純粋な個数比なので、質量保存の観点で
-            //   そのまま除去率(recovery)として解釈できる。
             const totalStatCount = statDead + statExit;
             const r = totalStatCount > 0 ? (statDead / totalStatCount * 100).toFixed(1) + '%' : '0%';
             document.getElementById('s-rate').textContent = r;
             document.getElementById('s-time').textContent = simTime.toFixed(3) + ' s';
 
-            // --- 流動場の指標 ---
-            document.getElementById('out-ubulk').textContent = (p.Ubulk * p.H).toFixed(3); // 単位奥行流量 q=U*H [m^2/s]
+            document.getElementById('out-ubulk').textContent = (p.Ubulk * p.H).toFixed(3);
             document.getElementById('out-ustar').textContent = p.ustar.toFixed(4);
-            const yv = p.Re >= 2300 ? 5 * nu / p.ustar * 1000 : Infinity; // 粘性底層厚さ[mm](乱流のみ意味を持つ)
+            const yv = p.Re >= 2300 ? 5 * nu / p.ustar * 1000 : Infinity;
             document.getElementById('out-yv').textContent = (isFinite(yv) ? yv.toFixed(4) : 'N/A');
 
             const reText = Math.round(p.Re).toFixed(0);
             const flowType = p.Re < 2300 ? " (層流)" : " (乱流)";
             document.getElementById('out-re').textContent = reText + flowType;
 
-            document.getElementById('out-sc').textContent = (nu / p.Dm).toFixed(1); // Schmidt数 Sc=nu/Dm
-            document.getElementById('out-vw').textContent = p.vw.toExponential(2);  // 膜透過速度[m/s](GPUのみに依存)
+            document.getElementById('out-sc').textContent = (nu / p.Dm).toFixed(1);
+            document.getElementById('out-ks').textContent = p.ks.toExponential(2);
 
-            // --- 物質移動係数まわり(定常統計が50フレーム貯まってから表示) ---
             const statsReady = concSamples >= 50;
             document.getElementById('out-km').textContent = statsReady ? kmValue.toExponential(3) : '—';
             document.getElementById('out-cw').textContent = statsReady ? wallConcRatio.toFixed(3) : '—';
 
-            // 律速指標 km/v_w: 1未満なら境界層(外側の流れ)が律速、
-            //   1以上なら膜透過そのものが律速であることを表す無次元数。
-            let kmvwText = '—';
-            if (statsReady && p.vw > 0) {
-                const ratio = kmValue / p.vw;
+            let kmksText = '—';
+            if (statsReady && p.ks > 0) {
+                const ratio = kmValue / p.ks;
                 const typeText = ratio < 1.0 ? " (境界層律速)" : " (透過膜律速)";
-                kmvwText = ratio.toFixed(3) + typeText;
+                kmksText = ratio.toFixed(3) + typeText;
             }
-            document.getElementById('out-kmvw').textContent = kmvwText;
+            document.getElementById('out-kmks').textContent = kmksText;
 
             const sh = statsReady && kmValue > 0 ? shValue.toFixed(4) : '—';
             document.getElementById('out-sh').textContent = sh;
         }
 
-        // loop(): requestAnimationFrameで駆動するメインループ。
-        //   毎フレームstep()で1タイムステップ進め、3フレームに1回
-        //   新規粒子を流入させる(粒子生成コストを抑えつつ流入密度を保つ)。
         let fc = 0;
         function loop() {
             if (!running) { rafId = null; return; }
@@ -1249,7 +1075,6 @@
             rafId = requestAnimationFrame(loop);
         }
 
-        // 「開始/停止」ボタン: runningフラグをトグルし、アニメーションループの起動/停止を制御
         document.getElementById('btn-run').addEventListener('click', function () {
             running = !running; this.textContent = running ? '⏸ 停止' : '▶ 開始';
             if (running) this.classList.remove('secondary');
@@ -1257,7 +1082,6 @@
             if (running && !rafId) rafId = requestAnimationFrame(loop);
         });
 
-        // 「リセット」ボタン: 実行を止めて全状態を初期化する
         document.getElementById('btn-reset').addEventListener('click', function () {
             running = false;
             const runBtn = document.getElementById('btn-run');
@@ -1267,16 +1091,11 @@
             resetAll();
         });
 
-        // 「粒子表示/平均粒子密度表示」切替ボタン: showMapフラグをトグルし、
-        //   個々の粒子を点で描くか、時間平均密度をヒートマップで描くかを切り替える
         document.getElementById('btn-view').addEventListener('click', function () {
             showMap = !showMap; this.textContent = showMap ? '粒子表示' : '平均粒子密度表示';
             redraw();
         });
 
-        // bindSlider(id): スライダー操作時に表示だけを即時更新する
-        //   (シミュレーション停止中でも見た目上のプロファイル(drawProf等)が
-        //    連動して変わるようにするため、redraw()も呼ぶ)
         function bindSlider(id) {
             const el = document.getElementById(id);
             el.addEventListener('input', () => {
@@ -1287,7 +1106,6 @@
 
         ['sl-h', 'sl-q', 'sl-gpu', 'sl-co2', 'sl-patm', 'sl-dm', 'sl-inf'].forEach(bindSlider);
 
-        // 初期表示(ページロード直後、粒子ゼロの状態での描画)
         updateDisplays();
         redraw();
     </script>
