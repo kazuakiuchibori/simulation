@@ -242,6 +242,7 @@
 
         // 幾何学メトリック
         let metrics = null;
+        let faceCoef = null; // 保存形ラプラシアン用の面係数
 
         // CFD設定パラメータ
         let isCfdRunning = false;
@@ -499,6 +500,51 @@
                     metrics.gamma[idx] = x_xi * x_xi + y_xi * y_xi;
                 }
             }
+            computeFaceCoefficients();
+        }
+
+        // 保存形ラプラシアン  ∇²φ = (1/J)[ ∂ξ(F1) + ∂η(F2) ]
+        //   F1 = (α/J) φ_ξ - (β/J) φ_η ,  F2 = (γ/J) φ_η - (β/J) φ_ξ
+        // のフラックスを「面(半格子点)」で評価するための係数を、格子座標から直接計算する。
+        // 節点のメトリクスは i=0, imax-1 で片側差分が 0.5 倍されているため、面係数には使わない。
+        //   aE, bE : ξ面 (i+1/2, j) の α/J, β/J
+        //   cN, bN : η面 (i, j+1/2) の γ/J, β/J
+        function computeFaceCoefficients() {
+            const size = imax * jmax;
+            faceCoef = {
+                aE: new Float64Array(size), bE: new Float64Array(size),
+                cN: new Float64Array(size), bN: new Float64Array(size)
+            };
+            for (let i = 0; i < imax; i++) {
+                for (let j = 0; j < jmax - 1; j++) {
+                    const idx = getIdx(i, j);
+                    const jp = getIdx(i, j + 1), jm = getIdx(i, j - 1);
+
+                    if (i < imax - 1) {
+                        const ip = getIdx(i + 1, j);
+                        const ipjp = getIdx(i + 1, j + 1), ipjm = getIdx(i + 1, j - 1);
+                        const x_xi = gridX[ip] - gridX[idx];
+                        const y_xi = gridY[ip] - gridY[idx];
+                        const x_eta = 0.25 * (gridX[jp] - gridX[jm] + gridX[ipjp] - gridX[ipjm]);
+                        const y_eta = 0.25 * (gridY[jp] - gridY[jm] + gridY[ipjp] - gridY[ipjm]);
+                        const Jf = x_xi * y_eta - x_eta * y_xi;
+                        faceCoef.aE[idx] = (x_eta * x_eta + y_eta * y_eta) / Jf;
+                        faceCoef.bE[idx] = (x_xi * x_eta + y_xi * y_eta) / Jf;
+                    }
+
+                    if (i > 0 && i < imax - 1) {
+                        const ip = getIdx(i + 1, j), im = getIdx(i - 1, j);
+                        const ipjp = getIdx(i + 1, j + 1), imjp = getIdx(i - 1, j + 1);
+                        const x_eta = gridX[jp] - gridX[idx];
+                        const y_eta = gridY[jp] - gridY[idx];
+                        const x_xi = 0.25 * (gridX[ip] - gridX[im] + gridX[ipjp] - gridX[imjp]);
+                        const y_xi = 0.25 * (gridY[ip] - gridY[im] + gridY[ipjp] - gridY[imjp]);
+                        const Jf = x_xi * y_eta - x_eta * y_xi;
+                        faceCoef.cN[idx] = (x_xi * x_xi + y_xi * y_xi) / Jf;
+                        faceCoef.bN[idx] = (x_xi * x_eta + y_xi * y_eta) / Jf;
+                    }
+                }
+            }
         }
 
         function initCfdBuffers() {
@@ -669,6 +715,11 @@
 
             const omega_u = 1.0;
 
+            // 粘性項（陰的）: (1 - dt/Re * L) u = rhs ,  L = (1/J)(M + X) を保存形・面フラックスで離散化
+            //   M : 軸方向フラックス差（コンパクト3点）,  X : 混合微分（斜め）フラックス差（反復中は最新値で評価）
+            const aE = faceCoef.aE, bE = faceCoef.bE, cN = faceCoef.cN, bN = faceCoef.bN;
+            const Jm = metrics.J;
+
             for (let iter = 0; iter < 10; iter++) {
                 for (let i = 1; i < imax - 1; i++) {
                     for (let j = 0; j < jmax - 1; j++) {
@@ -678,18 +729,25 @@
                         const ipjp = getIdx(i + 1, j + 1), ipjm = getIdx(i + 1, j - 1);
                         const imjp = getIdx(i - 1, j + 1), imjm = getIdx(i - 1, j - 1);
 
-                        const u_xi_eta = 0.25 * (uFlowTmp[ipjp] - uFlowTmp[ipjm] - uFlowTmp[imjp] + uFlowTmp[imjm]);
-                        const v_xi_eta = 0.25 * (vFlowTmp[ipjp] - vFlowTmp[ipjm] - vFlowTmp[imjp] + vFlowTmp[imjm]);
+                        const ae = aE[idx], aw = aE[im], cn = cN[idx], cs = cN[jm];
+                        const be = bE[idx], bw = bE[im], bn = bN[idx], bs = bN[jm];
 
-                        const J2 = metrics.J[idx] ** 2;
-                        const ax = dt * metrics.alpha[idx] / (J2 * Re);
-                        const ay = dt * metrics.gamma[idx] / (J2 * Re);
-                        const abeta = dt * metrics.beta[idx] / (J2 * Re);
+                        const k = dt / (Re * Jm[idx]);
+                        const denom = 1.0 + k * (ae + aw + cn + cs);
 
-                        const denom = 1.0 + 2.0 * ax + 2.0 * ay;
+                        const fu = uFlowTmp;
+                        const Xu = -(be * 0.25 * (fu[jp] + fu[ipjp] - fu[jm] - fu[ipjm])
+                                   - bw * 0.25 * (fu[imjp] + fu[jp] - fu[imjm] - fu[jm])
+                                   + bn * 0.25 * (fu[ip] + fu[ipjp] - fu[im] - fu[imjp])
+                                   - bs * 0.25 * (fu[ip] + fu[ipjm] - fu[im] - fu[imjm]));
+                        const uTarget = (rhsU[idx] + k * (ae * fu[ip] + aw * fu[im] + cn * fu[jp] + cs * fu[jm] + Xu)) / denom;
 
-                        const uTarget = (rhsU[idx] + ax * (uFlowTmp[ip] + uFlowTmp[im]) + ay * (uFlowTmp[jp] + uFlowTmp[jm]) - 2.0 * abeta * u_xi_eta) / denom;
-                        const vTarget = (rhsV[idx] + ax * (vFlowTmp[ip] + vFlowTmp[im]) + ay * (vFlowTmp[jp] + vFlowTmp[jm]) - 2.0 * abeta * v_xi_eta) / denom;
+                        const fv = vFlowTmp;
+                        const Xv = -(be * 0.25 * (fv[jp] + fv[ipjp] - fv[jm] - fv[ipjm])
+                                   - bw * 0.25 * (fv[imjp] + fv[jp] - fv[imjm] - fv[jm])
+                                   + bn * 0.25 * (fv[ip] + fv[ipjp] - fv[im] - fv[imjp])
+                                   - bs * 0.25 * (fv[ip] + fv[ipjm] - fv[im] - fv[imjm]));
+                        const vTarget = (rhsV[idx] + k * (ae * fv[ip] + aw * fv[im] + cn * fv[jp] + cs * fv[jm] + Xv)) / denom;
 
                         uFlowTmp[idx] += omega_u * (uTarget - uFlowTmp[idx]);
                         vFlowTmp[idx] += omega_u * (vTarget - vFlowTmp[idx]);
@@ -722,6 +780,7 @@
 
             const omega_p = 1.8;
 
+            // 圧力ポアソン:  (1/J)(M + X) = div(u*)/dt   →   M + X = J * src
             for (let iter = 0; iter < 30; iter++) {
                 for (let i = 1; i < imax - 1; i++) {
                     for (let j = 0; j < jmax - 1; j++) {
@@ -731,15 +790,17 @@
                         const ipjp = getIdx(i + 1, j + 1), ipjm = getIdx(i + 1, j - 1);
                         const imjp = getIdx(i - 1, j + 1), imjm = getIdx(i - 1, j - 1);
 
-                        const pc_xi_eta = 0.25 * (pFlow[ipjp] - pFlow[ipjm] - pFlow[imjp] + pFlow[imjm]);
-                        const denom = 2.0 * (metrics.alpha[idx] + metrics.gamma[idx]);
+                        const ae = aE[idx], aw = aE[im], cn = cN[idx], cs = cN[jm];
+                        const be = bE[idx], bw = bE[im], bn = bN[idx], bs = bN[jm];
 
-                        const target = (
-                            metrics.alpha[idx] * (pFlow[ip] + pFlow[im])
-                            + metrics.gamma[idx] * (pFlow[jp] + pFlow[jm])
-                            - 2.0 * metrics.beta[idx] * pc_xi_eta
-                            - (metrics.J[idx] ** 2) * src[idx]
-                        ) / denom;
+                        const fp = pFlow;
+                        const Xp = -(be * 0.25 * (fp[jp] + fp[ipjp] - fp[jm] - fp[ipjm])
+                                   - bw * 0.25 * (fp[imjp] + fp[jp] - fp[imjm] - fp[jm])
+                                   + bn * 0.25 * (fp[ip] + fp[ipjp] - fp[im] - fp[imjp])
+                                   - bs * 0.25 * (fp[ip] + fp[ipjm] - fp[im] - fp[imjm]));
+
+                        const target = (ae * fp[ip] + aw * fp[im] + cn * fp[jp] + cs * fp[jm] + Xp
+                                        - Jm[idx] * src[idx]) / (ae + aw + cn + cs);
 
                         pFlow[idx] += omega_p * (target - pFlow[idx]);
                     }
